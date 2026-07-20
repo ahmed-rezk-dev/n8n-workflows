@@ -24,10 +24,22 @@ services:
       - N8N_PORT=5678
       - N8N_PROTOCOL=http
       - WEBHOOK_URL=http://${N8N_HOST:-localhost}:5678/
+      - N8N_RUNNERS_ENABLED=true
+      - GENERIC_TIMEZONE=${TZ:-America/New_York}
+      - TZ=${TZ:-America/New_York}
+      
+      # Expose env vars to workflows
+      - N8N_PUBLIC_API_DISABLED=false
+      - N8N_EXPERIMENTAL_ENV_VARS_ACCESS=true
       
       # Timezone (change to your timezone)
       - GENERIC_TIMEZONE=${TZ:-America/New_York}
       - TZ=${TZ:-America/New_York}
+      
+      # Nextcloud configuration
+      - NEXTCLOUD_URL=${NEXTCLOUD_URL}
+      - NEXTCLOUD_USER=${NEXTCLOUD_USER}
+      - NEXTCLOUD_APP_PASSWORD=${NEXTCLOUD_APP_PASSWORD}
     volumes:
       - n8n_data:/home/node/.n8n
       - ./local-files:/home/node/local-files

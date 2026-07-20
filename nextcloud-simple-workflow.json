@@ -17,8 +17,33 @@
     },
     {
       "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "nextcloud-url",
+              "name": "nextcloudUrl",
+              "value": "https://cloud.tal.ahmed-rezk.com",
+              "type": "string"
+            },
+            {
+              "id": "nextcloud-user",
+              "name": "nextcloudUser",
+              "value": "admin",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "set-config",
+      "name": "Set Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
         "method": "GET",
-        "url": "={{ $env.NEXTCLOUD_URL }}/remote.php/dav/calendars/{{ $env.NEXTCLOUD_USER }}/tasks/",
+        "url": "={{ $json.nextcloudUrl }}/remote.php/dav/calendars/{{ $json.nextcloudUser }}/tasks/",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpBasicAuth",
         "sendHeaders": true,
@@ -42,7 +67,7 @@
       "name": "Get Tasks from Nextcloud",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [470, 300],
+      "position": [690, 300],
       "credentials": {
         "httpBasicAuth": {
           "id": "YOUR_CREDENTIAL_ID",
@@ -53,17 +78,28 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parse CalDAV XML response\nconst xml = $input.first().json.data || '';\n\nconst tasks = [];\n\n// Match VTODO blocks\nconst vtodoMatches = xml.match(/<cal:VTODO[^>]*>[\\s\\S]*?<\\/cal:VTODO>/gi) || [];\n\nfor (const vtodo of vtodoMatches) {\n  const title = vtodo.match(/<cal:SUMMARY[^>]*>([^<]*)<\\/cal:SUMMARY>/i);\n  const uid = vtodo.match(/<cal:UID[^>]*>([^<]*)<\\/cal:UID>/i);\n  const status = vtodo.match(/<cal:STATUS[^>]*>([^<]*)<\\/cal:STATUS>/i);\n  const due = vtodo.match(/<cal:DTEND[^>]*>([^<]*)<\\/cal:DTEND>/i);\n  const description = vtodo.match(/<cal:DESCRIPTION[^>]*>([^<]*)<\\/cal:DESCRIPTION>/i);\n  const priority = vtodo.match(/<cal:PRIORITY[^>]*>([^<]*)<\\/cal:PRIORITY>/i);\n  const completed = vtodo.match(/<cal:COMPLETED[^>]*>([^<]*)<\\/cal:COMPLETED>/i);\n  \n  tasks.push({\n    uid: uid ? uid[1] : 'unknown',\n    title: title ? title[1] : 'Untitled',\n    status: status ? status[1] : 'NEEDS-ACTION',\n    due: due ? due[1] : null,\n    description: description ? description[1] : null,\n    priority: priority ? parseInt(priority[1]) : null,\n    completed: completed ? completed[1] : null\n  });\n}\n\nreturn [{ json: { tasks, count: tasks.length } }];"
+        "jsCode": "// Parse CalDAV XML response\nconst xml = $input.first().json.data || '';\n\nconst tasks = [];\n\n// Match VTODO blocks\nconst vtodoMatches = xml.match(/<cal:VTODO[^>]*>[\\s\\S]*?<\\/cal:VTODO>/gi) || [];\n\nfor (const vtodo of vtodoMatches) {\n  const title = vtodo.match(/<cal:SUMMARY[^>]*>([^<]*)<\\/cal:SUMMARY>/i);\n  const uid = vtodo.match(/<cal:UID[^>]*>([^<]*)<\\/cal:UID>/i);\n  const status = vtodo.match(/<cal:STATUS[^>]*>([^<]*)<\\/cal:STATUS>/i);\n  const due = vtodo.match(/<cal:DTEND[^>]*>([^<]*)<\\/cal:DTEND>/i);\n  const description = vtodo.match(/<cal:DESCRIPTION[^>]*>([^<]*)<\\/cal:DESCRIPTION>/i);\n  const priority = vtodo.match(/<cal:PRIORITY[^>]*>([^<]*)<\\/cal:PRIORITY>/i);\n  \n  tasks.push({\n    uid: uid ? uid[1] : 'unknown',\n    title: title ? title[1] : 'Untitled',\n    status: status ? status[1] : 'NEEDS-ACTION',\n    due: due ? due[1] : null,\n    description: description ? description[1] : null,\n    priority: priority ? parseInt(priority[1]) : null\n  });\n}\n\nreturn [{ json: { tasks, count: tasks.length } }];"
       },
       "id": "parse-xml",
       "name": "Parse Tasks",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [690, 300]
+      "position": [910, 300]
     }
   ],
   "connections": {
     "Webhook - Get Tasks": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Config": {
       "main": [
         [
           {

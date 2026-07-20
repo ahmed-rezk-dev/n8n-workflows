@@ -17,21 +17,46 @@
     },
     {
       "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "nextcloud-url",
+              "name": "nextcloudUrl",
+              "value": "https://cloud.tal.ahmed-rezk.com",
+              "type": "string"
+            },
+            {
+              "id": "nextcloud-user",
+              "name": "nextcloudUser",
+              "value": "admin",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "set-config",
+      "name": "Set Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
         "method": "PUT",
-        "url": "={{ $env.NEXTCLOUD_URL }}/remote.php/dav/calendars/{{ $env.NEXTCLOUD_USER }}/tasks/{{ $now.toSeconds() }}.ics",
+        "url": "={{ $json.nextcloudUrl }}/remote.php/dav/calendars/{{ $json.nextcloudUser }}/tasks/{{ $now.toSeconds() }}.ics",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpBasicAuth",
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "text/calendar",
-        "body": "=BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//n8n//Nextcloud//EN\nBEGIN:VTODO\nUID:{{ $now.toSeconds() }}\nDTSTAMP:{{ $now.toFormat('yyyyMMdd\\THHmmss\\Z') }}\nSUMMARY:{{ $json.body.title }}\n{{ $json.body.description ? 'DESCRIPTION:' + $json.body.description + '\\n' : '' }}{{ $json.body.due ? 'DTEND:' + $json.body.due + '\\n' : '' }}{{ $json.body.priority ? 'PRIORITY:' + $json.body.priority + '\\n' : '' }}STATUS:NEEDS-ACTION\nEND:VTODO\nEND:VCALENDAR",
+        "body": "=BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//n8n//Nextcloud//EN\nBEGIN:VTODO\nUID:{{ $now.toSeconds() }}\nDTSTAMP:{{ $now.toFormat('yyyyMMdd\\THHmmss\\Z') }}\nSUMMARY:{{ $('Webhook - Create Task').first().json.body.title }}\n{{ $('Webhook - Create Task').first().json.body.description ? 'DESCRIPTION:' + $('Webhook - Create Task').first().json.body.description + '\\n' : '' }}{{ $('Webhook - Create Task').first().json.body.due ? 'DTEND:' + $('Webhook - Create Task').first().json.body.due + '\\n' : '' }}STATUS:NEEDS-ACTION\nEND:VTODO\nEND:VCALENDAR",
         "options": {}
       },
       "id": "create-task",
       "name": "Create Task in Nextcloud",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [470, 300],
+      "position": [690, 300],
       "credentials": {
         "httpBasicAuth": {
           "id": "YOUR_CREDENTIAL_ID",
@@ -42,17 +67,28 @@
     },
     {
       "parameters": {
-        "jsCode": "const response = $input.first();\nconst body = response.json.body || response.json;\n\nif (response.json.statusCode === 201 || response.json.statusCode === 204 || !response.json.error) {\n  return [{\n    json: {\n      success: true,\n      message: 'Task created successfully!',\n      task: {\n        title: $('Webhook - Create Task').first().json.body.title,\n        description: $('Webhook - Create Task').first().json.body.description || null,\n        due: $('Webhook - Create Task').first().json.body.due || null\n      }\n    }\n  }];\n} else {\n  return [{\n    json: {\n      success: false,\n      message: 'Failed to create task',\n      error: body\n    }\n  }];\n}"
+        "jsCode": "const response = $input.first();\n\nif (response.json.statusCode === 201 || response.json.statusCode === 204 || !response.json.error) {\n  return [{\n    json: {\n      success: true,\n      message: 'Task created successfully!',\n      task: {\n        title: $('Webhook - Create Task').first().json.body.title,\n        description: $('Webhook - Create Task').first().json.body.description || null,\n        due: $('Webhook - Create Task').first().json.body.due || null\n      }\n    }\n  }];\n} else {\n  return [{\n    json: {\n      success: false,\n      message: 'Failed to create task',\n      error: response.json\n    }\n  }];\n}"
       },
       "id": "format-response",
       "name": "Format Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [690, 300]
+      "position": [910, 300]
     }
   ],
   "connections": {
     "Webhook - Create Task": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Config": {
       "main": [
         [
           {
