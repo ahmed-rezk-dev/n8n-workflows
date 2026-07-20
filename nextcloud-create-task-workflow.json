@@ -49,7 +49,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "text/calendar",
-        "body": "=BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//n8n//Nextcloud//EN\nBEGIN:VTODO\nUID:{{ $now.toSeconds() }}\nDTSTAMP:{{ $now.toFormat('yyyyMMdd\\THHmmss\\Z') }}\nSUMMARY:{{ $('Webhook - Create Task').first().json.body.title }}\n{{ $('Webhook - Create Task').first().json.body.description ? 'DESCRIPTION:' + $('Webhook - Create Task').first().json.body.description + '\\n' : '' }}{{ $('Webhook - Create Task').first().json.body.due ? 'DTEND:' + $('Webhook - Create Task').first().json.body.due + '\\n' : '' }}STATUS:NEEDS-ACTION\nEND:VTODO\nEND:VCALENDAR",
+        "body": "=BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//n8n//Nextcloud//EN\nBEGIN:VTODO\nUID:n8n-task-{{ Date.now() }}\nDTSTAMP:{{ $now.toFormat('yyyyMMdd\\THHmmss\\Z') }}\nSUMMARY:{{ $('Webhook - Create Task').first().json.body.title }}\n{{ $('Webhook - Create Task').first().json.body.description ? 'DESCRIPTION:' + $('Webhook - Create Task').first().json.body.description + '\\n' : '' }}STATUS:NEEDS-ACTION\nEND:VTODO\nEND:VCALENDAR",
         "options": {}
       },
       "id": "create-task",
