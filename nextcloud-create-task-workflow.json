@@ -42,21 +42,31 @@
     },
     {
       "parameters": {
+        "jsCode": "// Build the ICS content properly\nconst title = $('Webhook - Create Task').first().json.body.title;\nconst description = $('Webhook - Create Task').first().json.body.description || '';\nconst taskId = Date.now();\n\n// Format current date for DTSTAMP\nconst now = new Date();\nconst year = now.getUTCFullYear();\nconst month = String(now.getUTCMonth() + 1).padStart(2, '0');\nconst day = String(now.getUTCDate()).padStart(2, '0');\nconst hours = String(now.getUTCHours()).padStart(2, '0');\nconst minutes = String(now.getUTCMinutes()).padStart(2, '0');\nconst seconds = String(now.getUTCSeconds()).padStart(2, '0');\nconst dtstamp = `${year}${month}${day}T${hours}${minutes}${seconds}Z`;\n\nconst icsBody = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//n8n//Nextcloud//EN\nBEGIN:VTODO\nUID:n8n-task-${taskId}\nDTSTAMP:${dtstamp}\nSUMMARY:${title}\nDESCRIPTION:${description}\nSTATUS:NEEDS-ACTION\nEND:VTODO\nEND:VCALENDAR`;\n\nreturn [{ json: { nextcloudUrl: $('Set Config').first().json.nextcloudUrl, nextcloudUser: $('Set Config').first().json.nextcloudUser, icsBody } }];"
+      },
+      "id": "build-ics",
+      "name": "Build ICS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
         "method": "PUT",
-        "url": "={{ $json.nextcloudUrl }}/remote.php/dav/calendars/{{ $json.nextcloudUser }}/tasks/{{ $now.toSeconds() }}.ics",
+        "url": "={{ $json.nextcloudUrl }}/remote.php/dav/calendars/{{ $json.nextcloudUser }}/tasks/{{ Date.now() }}.ics",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpBasicAuth",
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "text/calendar",
-        "body": "=BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//n8n//Nextcloud//EN\nBEGIN:VTODO\nUID:n8n-task-{{ Date.now() }}\nDTSTAMP:{{ $now.toFormat('yyyyMMdd\\THHmmss\\Z') }}\nSUMMARY:{{ $('Webhook - Create Task').first().json.body.title }}\n{{ $('Webhook - Create Task').first().json.body.description ? 'DESCRIPTION:' + $('Webhook - Create Task').first().json.body.description + '\\n' : '' }}STATUS:NEEDS-ACTION\nEND:VTODO\nEND:VCALENDAR",
+        "body": "={{ $json.icsBody }}",
         "options": {}
       },
       "id": "create-task",
       "name": "Create Task in Nextcloud",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [690, 300],
+      "position": [910, 300],
       "credentials": {
         "httpBasicAuth": {
           "id": "YOUR_CREDENTIAL_ID",
@@ -67,13 +77,13 @@
     },
     {
       "parameters": {
-        "jsCode": "const response = $input.first();\n\nif (response.json.statusCode === 201 || response.json.statusCode === 204 || !response.json.error) {\n  return [{\n    json: {\n      success: true,\n      message: 'Task created successfully!',\n      task: {\n        title: $('Webhook - Create Task').first().json.body.title,\n        description: $('Webhook - Create Task').first().json.body.description || null,\n        due: $('Webhook - Create Task').first().json.body.due || null\n      }\n    }\n  }];\n} else {\n  return [{\n    json: {\n      success: false,\n      message: 'Failed to create task',\n      error: response.json\n    }\n  }];\n}"
+        "jsCode": "const response = $input.first();\n\nif (response.json.statusCode === 201 || response.json.statusCode === 204 || !response.json.error) {\n  return [{\n    json: {\n      success: true,\n      message: 'Task created successfully!',\n      task: {\n        title: $('Webhook - Create Task').first().json.body.title,\n        description: $('Webhook - Create Task').first().json.body.description || null\n      }\n    }\n  }];\n} else {\n  return [{\n    json: {\n      success: false,\n      message: 'Failed to create task',\n      error: response.json\n    }\n  }];\n}"
       },
       "id": "format-response",
       "name": "Format Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [910, 300]
+      "position": [1130, 300]
     }
   ],
   "connections": {
@@ -89,6 +99,17 @@
       ]
     },
     "Set Config": {
+      "main": [
+        [
+          {
+            "node": "Build ICS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build ICS": {
       "main": [
         [
           {
