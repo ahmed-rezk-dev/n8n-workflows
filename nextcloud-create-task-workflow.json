@@ -1,0 +1,92 @@
+{
+  "name": "Nextcloud - Create Task",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nextcloud-create-task",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook - Create Task",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "create-task"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $env.NEXTCLOUD_URL }}/remote.php/dav/calendars/{{ $env.NEXTCLOUD_USER }}/tasks/{{ $now.toSeconds() }}.ics",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "raw",
+        "rawBody": "=BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//n8n//Nextcloud//EN\nBEGIN:VTODO\nUID:{{ $now.toSeconds() }}\nDTSTAMP:{{ $now.toFormat('yyyyMMdd\\THHmmss\\Z') }}\nSUMMARY:{{ $json.body.title }}\n{{ $json.body.description ? 'DESCRIPTION:' + $json.body.description + '\\n' : '' }}{{ $json.body.due ? 'DTEND:' + $json.body.due + '\\n' : '' }}{{ $json.body.priority ? 'PRIORITY:' + $json.body.priority + '\\n' : '' }}STATUS:NEEDS-ACTION\nEND:VTODO\nEND:VCALENDAR",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "text/calendar; charset=utf-8"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "create-task",
+      "name": "Create Task in Nextcloud",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [470, 300],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Nextcloud API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first();\nconst body = response.json.body || response.json;\n\nif (response.json.statusCode === 201 || response.json.statusCode === 204 || !response.json.error) {\n  return [{\n    json: {\n      success: true,\n      message: 'Task created successfully!',\n      task: {\n        title: $('Webhook - Create Task').first().json.body.title,\n        description: $('Webhook - Create Task').first().json.body.description || null,\n        due: $('Webhook - Create Task').first().json.body.due || null\n      }\n    }\n  }];\n} else {\n  return [{\n    json: {\n      success: false,\n      message: 'Failed to create task',\n      error: body\n    }\n  }];\n}"
+      },
+      "id": "format-response",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300]
+    }
+  ],
+  "connections": {
+    "Webhook - Create Task": {
+      "main": [
+        [
+          {
+            "node": "Create Task in Nextcloud",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Task in Nextcloud": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1
+}
