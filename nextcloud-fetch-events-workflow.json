@@ -1,0 +1,158 @@
+{
+  "name": "Nextcloud - Fetch Calendar Events",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "nextcloud-events",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook - Get Events",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "get-events"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "nextcloud-url",
+              "name": "nextcloudUrl",
+              "value": "https://cloud.tal.ahmed-rezk.com",
+              "type": "string"
+            },
+            {
+              "id": "nextcloud-user",
+              "name": "nextcloudUser",
+              "value": "admin",
+              "type": "string"
+            },
+            {
+              "id": "default-calendar",
+              "name": "defaultCalendar",
+              "value": "personal",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "set-config",
+      "name": "Set Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build query parameters for time range filtering\nconst body = $('Webhook - Get Events').first().json.body || {};\nconst calendarName = body.calendar || $('Set Config').first().json.defaultCalendar;\n\n// Default time range: fetch all events\nlet timeRange = '';\nif (body.startDate || body.endDate) {\n  // If specific dates provided, use them for filtering\n  const start = body.startDate ? new Date(body.startDate) : new Date();\n  const end = body.endDate ? new Date(body.endDate) : new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);\n  \n  const formatICalDate = (d) => {\n    const year = d.getUTCFullYear();\n    const month = String(d.getUTCMonth() + 1).padStart(2, '0');\n    const day = String(d.getUTCDate()).padStart(2, '0');\n    const hours = String(d.getUTCHours()).padStart(2, '0');\n    const minutes = String(d.getUTCMinutes()).padStart(2, '0');\n    const seconds = String(d.getUTCSeconds()).padStart(2, '0');\n    return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;\n  };\n  \n  timeRange = `?start=${formatICalDate(start)}&end=${formatICalDate(end)}`;\n}\n\nconst nextcloudUrl = $('Set Config').first().json.nextcloudUrl;\nconst nextcloudUser = $('Set Config').first().json.nextcloudUser;\nconst url = `${nextcloudUrl}/remote.php/dav/calendars/${nextcloudUser}/${calendarName}${timeRange}`;\n\nreturn [{ json: { url, calendarName } }];"
+      },
+      "id": "build-url",
+      "name": "Build URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Depth",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "get-events",
+      "name": "Get Events from Nextcloud",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [910, 300],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Nextcloud API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse CalDAV XML response for VEVENT\nconst xml = $input.first().json.data || '';\nconst calendarName = $('Build URL').first().json.calendarName;\n\nconst events = [];\n\n// Match VEVENT blocks\nconst veventMatches = xml.match(/<cal:VEVENT[^>]*>[\\s\\S]*?<\\/cal:VEVENT>/gi) || [];\n\nfor (const vevent of veventMatches) {\n  // Helper to extract value\n  const extract = (tag) => {\n    const match = vevent.match(new RegExp(`<cal:${tag}[^>]*>([^<]*)<\\\\/${tag}>`, 'i'));\n    return match ? match[1] : null;\n  };\n  \n  // Extract UID\n  const uid = extract('UID');\n  \n  // Extract dates\n  const dtstart = extract('DTSTART');\n  const dtend = extract('DTEND');\n  \n  // Check if all-day event (VALUE=DATE format: YYYYMMDD)\n  const isAllDay = dtstart && !dtstart.includes('T');\n  \n  // Parse iCal date to ISO\n  const parseICalDate = (icalDate) => {\n    if (!icalDate) return null;\n    // YYYYMMDDTHHMMSSZ or YYYYMMDD\n    if (icalDate.length === 8) {\n      // All-day: YYYYMMDD\n      return `${icalDate.substring(0, 4)}-${icalDate.substring(4, 6)}-${icalDate.substring(6, 8)}`;\n    } else {\n      // With time: YYYYMMDDTHHMMSSZ\n      const year = icalDate.substring(0, 4);\n      const month = icalDate.substring(4, 6);\n      const day = icalDate.substring(6, 8);\n      const hours = icalDate.substring(9, 11);\n      const minutes = icalDate.substring(11, 13);\n      const seconds = icalDate.substring(13, 15);\n      return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}Z`;\n    }\n  };\n  \n  // Extract other properties\n  const summary = extract('SUMMARY');\n  const description = extract('DESCRIPTION');\n  const location = extract('LOCATION');\n  const status = extract('STATUS');\n  const priority = extract('PRIORITY');\n  const transparency = extract('TRANSP');\n  const url = extract('URL');\n  const categories = extract('CATEGORIES');\n  const sequence = extract('SEQUENCE');\n  \n  // Extract RRULE\n  const rruleMatch = vevent.match(/<cal:RRULE[^>]*>([^<]*)<\\/cal:RRULE>/i);\n  const recurrence = rruleMatch ? rruleMatch[1] : null;\n  \n  // Extract ATTENDEES\n  const attendees = [];\n  const attendeeMatches = vevent.match(/<cal:ATTENDEE[^>]*>([^<]*)<\\/cal:ATTENDEE>/gi) || [];\n  for (const att of attendeeMatches) {\n    const email = att.match(/mailto:([^<]*)/i);\n    const cn = att.match(/CN=([^;]*)/i);\n    const partstat = att.match(/PARTSTAT=([^;]*)/i);\n    if (email) {\n      attendees.push({\n        email: email[1],\n        name: cn ? cn[1] : null,\n        status: partstat ? partstat[1] : 'NEEDS-ACTION'\n      });\n    }\n  }\n  \n  // Extract ORGANIZER\n  const organizerMatch = vevent.match(/<cal:ORGANIZER[^>]*>([^<]*)<\\/cal:ORGANIZER>/i);\n  let organizer = null;\n  if (organizerMatch) {\n    const email = organizerMatch[1].match(/mailto:([^<]*)/i);\n    const cn = organizerMatch[0].match(/CN=([^;]*)/i);\n    organizer = {\n      email: email ? email[1] : null,\n      name: cn ? cn[1] : null\n    };\n  }\n  \n  // Extract EXDATE\n  const exdateMatches = vevent.match(/<cal:EXDATE[^>]*>([^<]*)<\\/cal:EXDATE>/gi) || [];\n  const exceptions = exdateMatches.map(ex => {\n    const date = ex.match(/>([^<]*)</);\n    return date ? parseICalDate(date[1]) : null;\n  }).filter(d => d);\n  \n  // Extract href for event URL\n  const hrefMatch = vevent.match(/<d:href>([^<]*)<\\/d:href>/i);\n  const href = hrefMatch ? hrefMatch[1] : null;\n  \n  events.push({\n    uid: uid || 'unknown',\n    title: summary || 'Untitled',\n    description: description || null,\n    start: parseICalDate(dtstart),\n    end: parseICalDate(dtend),\n    allDay: isAllDay,\n    location: location || null,\n    status: status || 'CONFIRMED',\n    priority: priority ? parseInt(priority) : null,\n    transparency: transparency || 'OPAQUE',\n    categories: categories ? categories.split(',').map(c => c.trim()) : [],\n    recurrence: recurrence || null,\n    attendees,\n    organizer,\n    exceptions,\n    url: url || null,\n    sequence: sequence ? parseInt(sequence) : 0,\n    calendar: calendarName,\n    href: href || null\n  });\n}\n\nreturn [{ json: { events, count: events.length } }];"
+      },
+      "id": "parse-xml",
+      "name": "Parse Events",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1130, 300]
+    }
+  ],
+  "connections": {
+    "Webhook - Get Events": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Config": {
+      "main": [
+        [
+          {
+            "node": "Build URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build URL": {
+      "main": [
+        [
+          {
+            "node": "Get Events from Nextcloud",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Events from Nextcloud": {
+      "main": [
+        [
+          {
+            "node": "Parse Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1
+}

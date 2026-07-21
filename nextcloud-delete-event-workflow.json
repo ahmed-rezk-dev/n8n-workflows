@@ -1,0 +1,143 @@
+{
+  "name": "Nextcloud - Delete Calendar Event",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nextcloud-delete-event",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook - Delete Event",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "delete-event"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "nextcloud-url",
+              "name": "nextcloudUrl",
+              "value": "https://cloud.tal.ahmed-rezk.com",
+              "type": "string"
+            },
+            {
+              "id": "nextcloud-user",
+              "name": "nextcloudUser",
+              "value": "admin",
+              "type": "string"
+            },
+            {
+              "id": "default-calendar",
+              "name": "defaultCalendar",
+              "value": "personal",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "set-config",
+      "name": "Set Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build delete URL\nconst body = $('Webhook - Delete Event').first().json.body;\nconst nextcloudUrl = $('Set Config').first().json.nextcloudUrl;\nconst nextcloudUser = $('Set Config').first().json.nextcloudUser;\nconst defaultCalendar = $('Set Config').first().json.defaultCalendar;\n\n// Required: eventUid\nif (!body.eventUid) {\n  return [{ json: { error: 'eventUid is required' } }];\n}\n\nconst calendarName = body.calendar || defaultCalendar;\nconst eventUrl = `${nextcloudUrl}/remote.php/dav/calendars/${nextcloudUser}/${calendarName}/${body.eventUid}.ics`;\n\nreturn [{\n  json: {\n    eventUrl,\n    eventUid: body.eventUid,\n    calendarName\n  }\n}];"
+      },
+      "id": "build-url",
+      "name": "Build URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ $json.eventUrl }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
+      "id": "delete-event",
+      "name": "Delete Event from Nextcloud",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [910, 300],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Nextcloud API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first();\nconst buildResult = $('Build URL').first().json;\n\nif (response.json.statusCode === 204 || response.json.statusCode === 200 || !response.json.error) {\n  return [{\n    json: {\n      success: true,\n      message: 'Calendar event deleted successfully!',\n      eventUid: buildResult.eventUid,\n      calendar: buildResult.calendarName\n    }\n  }];\n} else {\n  return [{\n    json: {\n      success: false,\n      message: 'Failed to delete calendar event',\n      error: response.json\n    }\n  }];\n}"
+      },
+      "id": "format-response",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1130, 300]
+    }
+  ],
+  "connections": {
+    "Webhook - Delete Event": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Config": {
+      "main": [
+        [
+          {
+            "node": "Build URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build URL": {
+      "main": [
+        [
+          {
+            "node": "Delete Event from Nextcloud",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Event from Nextcloud": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1
+}
