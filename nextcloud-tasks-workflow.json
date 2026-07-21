@@ -1,0 +1,481 @@
+{
+  "name": "Nextcloud - Tasks Manager",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nextcloud-tasks",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "tasks-manager"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "nextcloud-url",
+              "name": "nextcloudUrl",
+              "value": "https://cloud.tal.ahmed-rezk.com",
+              "type": "string"
+            },
+            {
+              "id": "nextcloud-user",
+              "name": "nextcloudUser",
+              "value": "admin",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "set-config",
+      "name": "Set Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "fetch",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Fetch"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "create",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Create"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "update",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Update"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "delete",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Delete"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "switch-action",
+      "name": "Switch Action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.NEXTCLOUD_URL || $json.nextcloudUrl }}/remote.php/dav/calendars/{{ $json.nextcloudUser }}/tasks/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Depth",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "fetch-tasks",
+      "name": "Fetch Tasks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [930, 100],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Nextcloud API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse CalDAV XML response\nconst xml = $input.first().json.data || '';\nconst tasks = [];\nconst vtodoMatches = xml.match(/<cal:VTODO[^>]*>[\\s\\S]*?<\\/cal:VTODO>/gi) || [];\n\nfor (const vtodo of vtodoMatches) {\n  const extract = (tag) => {\n    const match = vtodo.match(new RegExp(`<cal:${tag}[^>]*>([^<]*)<\\\\/${tag}>`, 'i'));\n    return match ? match[1] : null;\n  };\n  \n  tasks.push({\n    uid: extract('UID') || 'unknown',\n    title: extract('SUMMARY') || 'Untitled',\n    description: extract('DESCRIPTION'),\n    status: extract('STATUS') || 'NEEDS-ACTION',\n    due: extract('DTEND'),\n    startDate: extract('DTSTART'),\n    completed: extract('COMPLETED'),\n    priority: extract('PRIORITY') ? parseInt(extract('PRIORITY')) : null,\n    percentComplete: extract('PERCENT-COMPLETE') ? parseInt(extract('PERCENT-COMPLETE')) : null,\n    categories: extract('CATEGORIES') ? extract('CATEGORIES').split(',').map(c => c.trim()) : [],\n    duration: extract('DURATION'),\n    recurrence: extract('RRULE'),\n    location: extract('LOCATION'),\n    url: extract('URL'),\n    href: vtodo.match(/<d:href>([^<]*)<\\/d:href>/i)?.[1] || null\n  });\n}\n\nreturn [{ json: { success: true, tasks, count: tasks.length } }];"
+      },
+      "id": "parse-fetch",
+      "name": "Parse Fetch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1150, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build ICS for create\nconst body = $('Set Config').first().json.nextcloudUrl ? $('Webhook').first().json.body : $('Webhook').first().json.body;\nconst taskId = Date.now();\n\nconst formatICalDate = (d) => {\n  const year = d.getUTCFullYear();\n  const month = String(d.getUTCMonth() + 1).padStart(2, '0');\n  const day = String(d.getUTCDate()).padStart(2, '0');\n  const hours = String(d.getUTCHours()).padStart(2, '0');\n  const minutes = String(d.getUTCMinutes()).padStart(2, '0');\n  const seconds = String(d.getUTCSeconds()).padStart(2, '0');\n  return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;\n};\n\nconst parseDate = (dateStr) => {\n  if (!dateStr) return null;\n  const d = new Date(dateStr);\n  return isNaN(d.getTime()) ? null : d;\n};\n\nconst now = new Date();\nconst lines = [\n  'BEGIN:VCALENDAR',\n  'VERSION:2.0',\n  'PRODID:-//n8n//Nextcloud//EN',\n  'BEGIN:VTODO',\n  `UID:n8n-task-${taskId}`,\n  `DTSTAMP:${formatICalDate(now)}`\n];\n\nif (body.title) lines.push(`SUMMARY:${body.title}`);\nif (body.description) lines.push(`DESCRIPTION:${body.description}`);\nif (body.due) { const d = parseDate(body.due); if (d) lines.push(`DUE:${formatICalDate(d)}`); }\nif (body.startDate) { const d = parseDate(body.startDate); if (d) lines.push(`DTSTART:${formatICalDate(d)}`); }\nif (body.completed) { const d = parseDate(body.completed); if (d) lines.push(`COMPLETED:${formatICalDate(d)}`); }\n\nif (body.status) {\n  const statusMap = { 'todo': 'NEEDS-ACTION', 'in-progress': 'IN-PROCESS', 'completed': 'COMPLETED', 'cancelled': 'CANCELLED' };\n  lines.push(`STATUS:${statusMap[body.status] || body.status}`);\n} else {\n  lines.push('STATUS:NEEDS-ACTION');\n}\n\nif (body.priority !== undefined) lines.push(`PRIORITY:${Math.min(9, Math.max(1, parseInt(body.priority)))}`);\nif (body.percentComplete !== undefined) lines.push(`PERCENT-COMPLETE:${Math.min(100, Math.max(0, parseInt(body.percentComplete)))}`);\nif (body.categories) lines.push(`CATEGORIES:${Array.isArray(body.categories) ? body.categories.join(',') : body.categories}`);\nif (body.parentTaskUid) lines.push(`RELATED-TO;RELTYPE=PARENT:${body.parentTaskUid}`);\nif (body.duration) lines.push(`DURATION:${body.duration}`);\nif (body.recurrence) lines.push(`RRULE:${body.recurrence}`);\nif (body.location) lines.push(`LOCATION:${body.location}`);\nif (body.url) lines.push(`URL:${body.url}`);\n\nlines.push('END:VTODO', 'END:VCALENDAR');\n\nreturn [{ json: { icsBody: lines.join('\\r\\n'), nextcloudUrl: $('Set Config').first().json.nextcloudUrl, nextcloudUser: $('Set Config').first().json.nextcloudUser } }];"
+      },
+      "id": "build-create",
+      "name": "Build Create",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [930, 300]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $json.nextcloudUrl }}/remote.php/dav/calendars/{{ $json.nextcloudUser }}/tasks/{{ Date.now() }}.ics",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/calendar",
+        "body": "={{ $json.icsBody }}",
+        "options": {}
+      },
+      "id": "create-task",
+      "name": "Create Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1150, 300],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Nextcloud API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $('Webhook').first().json.body;\nreturn [{ json: { success: true, message: 'Task created!', task: { title: body.title, description: body.description || null, due: body.due || null, priority: body.priority || null, status: body.status || 'NEEDS-ACTION', categories: body.categories || [] } } }];"
+      },
+      "id": "format-create",
+      "name": "Format Create",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1370, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build ICS for update\nconst body = $('Webhook').first().json.body;\nif (!body.taskUid) return [{ json: { success: false, message: 'taskUid is required' } }];\n\nconst formatICalDate = (d) => {\n  const year = d.getUTCFullYear();\n  const month = String(d.getUTCMonth() + 1).padStart(2, '0');\n  const day = String(d.getUTCDate()).padStart(2, '0');\n  const hours = String(d.getUTCHours()).padStart(2, '0');\n  const minutes = String(d.getUTCMinutes()).padStart(2, '0');\n  const seconds = String(d.getUTCSeconds()).padStart(2, '0');\n  return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;\n};\n\nconst now = new Date();\nconst lines = [\n  'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//n8n//Nextcloud//EN',\n  'BEGIN:VTODO', `UID:${body.taskUid}`, `DTSTAMP:${formatICalDate(now)}`\n];\n\nif (body.title !== undefined) lines.push(`SUMMARY:${body.title}`);\nif (body.description !== undefined) lines.push(`DESCRIPTION:${body.description}`);\nif (body.due) { const d = new Date(body.due); if (!isNaN(d.getTime())) lines.push(`DUE:${formatICalDate(d)}`); }\n\nif (body.status) {\n  const statusMap = { 'todo': 'NEEDS-ACTION', 'in-progress': 'IN-PROCESS', 'completed': 'COMPLETED', 'cancelled': 'CANCELLED' };\n  lines.push(`STATUS:${statusMap[body.status] || body.status}`);\n  if (body.status === 'completed' || body.status === 'COMPLETED') lines.push(`COMPLETED:${formatICalDate(now)}`);\n}\n\nif (body.priority !== undefined) lines.push(`PRIORITY:${Math.min(9, Math.max(1, parseInt(body.priority)))}`);\nif (body.percentComplete !== undefined) lines.push(`PERCENT-COMPLETE:${Math.min(100, Math.max(0, parseInt(body.percentComplete)))}`);\nif (body.categories) lines.push(`CATEGORIES:${Array.isArray(body.categories) ? body.categories.join(',') : body.categories}`);\n\nlines.push('END:VTODO', 'END:VCALENDAR');\n\nconst nextcloudUrl = $('Set Config').first().json.nextcloudUrl;\nconst nextcloudUser = $('Set Config').first().json.nextcloudUser;\n\nreturn [{ json: { icsBody: lines.join('\\r\\n'), taskUrl: `${nextcloudUrl}/remote.php/dav/calendars/${nextcloudUser}/tasks/${body.taskUid}.ics`, taskUid: body.taskUid } }];"
+      },
+      "id": "build-update",
+      "name": "Build Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [930, 500]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $json.taskUrl }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/calendar",
+        "body": "={{ $json.icsBody }}",
+        "options": {}
+      },
+      "id": "update-task",
+      "name": "Update Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1150, 500],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Nextcloud API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $('Webhook').first().json.body;\nreturn [{ json: { success: true, message: 'Task updated!', task: { uid: body.taskUid, title: body.title || null, status: body.status || null, priority: body.priority || null } } }];"
+      },
+      "id": "format-update",
+      "name": "Format Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1370, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $('Webhook').first().json.body;\nif (!body.taskUid) return [{ json: { success: false, message: 'taskUid is required' } }];\n\nconst nextcloudUrl = $('Set Config').first().json.nextcloudUrl;\nconst nextcloudUser = $('Set Config').first().json.nextcloudUser;\n\nreturn [{ json: { taskUrl: `${nextcloudUrl}/remote.php/dav/calendars/${nextcloudUser}/tasks/${body.taskUid}.ics`, taskUid: body.taskUid } }];"
+      },
+      "id": "build-delete",
+      "name": "Build Delete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [930, 700]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ $json.taskUrl }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
+      "id": "delete-task",
+      "name": "Delete Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1150, 700],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Nextcloud API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $('Webhook').first().json.body;\nreturn [{ json: { success: true, message: 'Task deleted!', taskUid: body.taskUid } }];"
+      },
+      "id": "format-delete",
+      "name": "Format Delete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1370, 700]
+    },
+    {
+      "parameters": {
+        "jsCode": "const action = $('Webhook').first().json.body?.action || 'unknown';\nreturn [{ json: { success: false, message: `Invalid action: ${action}. Use fetch, create, update, or delete.` } }];"
+      },
+      "id": "format-error",
+      "name": "Format Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [930, 900]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Config": {
+      "main": [
+        [
+          {
+            "node": "Switch Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Action": {
+      "main": [
+        [
+          {
+            "node": "Fetch Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Create",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Update",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Delete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Tasks": {
+      "main": [
+        [
+          {
+            "node": "Parse Fetch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Create": {
+      "main": [
+        [
+          {
+            "node": "Create Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Task": {
+      "main": [
+        [
+          {
+            "node": "Format Create",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Update": {
+      "main": [
+        [
+          {
+            "node": "Update Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Task": {
+      "main": [
+        [
+          {
+            "node": "Format Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Delete": {
+      "main": [
+        [
+          {
+            "node": "Delete Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Task": {
+      "main": [
+        [
+          {
+            "node": "Format Delete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1
+}
