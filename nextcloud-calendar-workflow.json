@@ -19,18 +19,8 @@
       "parameters": {
         "assignments": {
           "assignments": [
-            {
-              "id": "action",
-              "name": "action",
-              "value": "={{ $('Webhook').first().json.body.action }}",
-              "type": "string"
-            },
-            {
-              "id": "webhook-body",
-              "name": "body",
-              "value": "={{ $('Webhook').first().json.body }}",
-              "type": "object"
-            }
+            { "id": "action", "name": "action", "value": "={{ $('Webhook').first().json.body.action }}", "type": "string" },
+            { "id": "body", "name": "body", "value": "={{ $('Webhook').first().json.body }}", "type": "object" }
           ]
         }
       },
@@ -44,22 +34,10 @@
       "parameters": {
         "rules": {
           "values": [
-            {
-              "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json.action }}", "rightValue": "fetch", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" },
-              "renameOutput": true, "outputKey": "Fetch"
-            },
-            {
-              "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json.action }}", "rightValue": "create", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" },
-              "renameOutput": true, "outputKey": "Create"
-            },
-            {
-              "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json.action }}", "rightValue": "update", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" },
-              "renameOutput": true, "outputKey": "Update"
-            },
-            {
-              "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json.action }}", "rightValue": "delete", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" },
-              "renameOutput": true, "outputKey": "Delete"
-            }
+            { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json.action }}", "rightValue": "fetch", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "Fetch" },
+            { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json.action }}", "rightValue": "create", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "Create" },
+            { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json.action }}", "rightValue": "update", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "Update" },
+            { "conditions": { "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json.action }}", "rightValue": "delete", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "renameOutput": true, "outputKey": "Delete" }
           ]
         },
         "options": { "fallbackOutput": "extra" }
@@ -72,67 +50,110 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $('Set Config').first().json.body || {};\nconst calendarName = body.calendar || 'personal';\nconst nextcloudUrl = 'https://cloud.tal.ahmed-rezk.com';\nconst nextcloudUser = 'admin';\n\nconst startDate = body.startDate || '2025-01-01';\nconst endDate = body.endDate || '2026-12-31';\nconst formatICalDate = (d) => new Date(d).toISOString().replace(/[-:]/g, '').replace(/\\.\\d{3}/, '');\n\nconst reportXml = `<?xml version=\"1.0\" encoding=\"utf-8\" ?>\n<c:calendar-query xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\">\n  <d:prop>\n    <d:getetag/>\n    <c:calendar-data/>\n  </d:prop>\n  <c:filter>\n    <c:comp-filter name=\"VCALENDAR\">\n      <c:comp-filter name=\"VEVENT\">\n        <c:time-range start=\"${formatICalDate(startDate)}\" end=\"${formatICalDate(endDate)}\"/>\n      </c:comp-filter>\n    </c:comp-filter>\n  </c:filter>\n</c:calendar-query>`;\n\nconst url = `${nextcloudUrl}/remote.php/dav/calendars/${nextcloudUser}/${calendarName}/`;\nconst auth = Buffer.from(`${nextcloudUser}:4EMsB-kQLNn-YdnCC-9Dd6Z-GA9jj`).toString('base64');\n\ntry {\n  const response = await fetch(url, {\n    method: 'REPORT',\n    headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/xml', 'Depth': '1' },\n    body: reportXml\n  });\n  const xml = await response.text();\n  const events = [];\n  const calDataMatches = xml.match(/<cal:calendar-data[^>]*>([\\s\\S]*?)<\\/cal:calendar-data>/gi) || [];\n  \n  for (const calDataMatch of calDataMatches) {\n    const calData = calDataMatch.replace(/<[^>]*>/g, '');\n    const veventMatch = calData.match(/BEGIN:VEVENT([\\s\\S]*?)END:VEVENT/);\n    if (!veventMatch) continue;\n    const vevent = veventMatch[0];\n    const extract = (tag) => { const m = vevent.match(new RegExp(`${tag}:(.*)`, 'i')); return m ? m[1].trim() : null; };\n    const dtstart = extract('DTSTART');\n    const isAllDay = dtstart && !dtstart.includes('T');\n    const parseICalDate = (d) => { if (!d) return null; d = d.replace(/Z$/, ''); if (d.length === 8) return `${d.substring(0,4)}-${d.substring(4,6)}-${d.substring(6,8)}`; return `${d.substring(0,4)}-${d.substring(4,6)}-${d.substring(6,8)}T${d.substring(9,11)}:${d.substring(11,13)}:${d.substring(13,15)}Z`; };\n    events.push({ uid: extract('UID') || 'unknown', title: extract('SUMMARY') || 'Untitled', description: extract('DESCRIPTION'), start: parseICalDate(dtstart), end: parseICalDate(extract('DTEND')), allDay: isAllDay, location: extract('LOCATION'), status: extract('STATUS') || 'CONFIRMED', priority: extract('PRIORITY') ? parseInt(extract('PRIORITY')) : null, categories: extract('CATEGORIES') ? extract('CATEGORIES').split(',').map(c => c.trim()) : [], recurrence: extract('RRULE'), calendar: calendarName });\n  }\n  return [{ json: { success: true, events, count: events.length } }];\n} catch (error) {\n  return [{ json: { success: false, error: error.message } }];\n}"
+        "method": "REPORT",
+        "url": "https://cloud.tal.ahmed-rezk.com/remote.php/dav/calendars/admin/personal/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Depth", "value": "1" }] },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/xml",
+        "body": "=<?xml version=\"1.0\" encoding=\"utf-8\" ?>\n<c:calendar-query xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\">\n  <d:prop>\n    <d:getetag/>\n    <c:calendar-data/>\n  </d:prop>\n  <c:filter>\n    <c:comp-filter name=\"VCALENDAR\">\n      <c:comp-filter name=\"VEVENT\">\n        <c:time-range start=\"20250101T000000Z\" end=\"20261231T000000Z\"/>\n      </c:comp-filter>\n    </c:comp-filter>\n  </c:filter>\n</c:calendar-query>",
+        "options": { "response": { "response": { "responseFormat": "text" } } }
       },
       "id": "fetch-events",
       "name": "Fetch Events",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [930, 100]
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [930, 100],
+      "credentials": { "httpBasicAuth": { "id": "YOUR_CREDENTIAL_ID", "name": "Nextcloud API" } },
+      "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const body = $('Set Config').first().json.body;\nconst eventId = Date.now();\nconst calendarName = body.calendar || 'personal';\n\nconst formatICalDate = (d) => { const pad = (n) => String(n).padStart(2,'0'); return `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`; };\nconst formatICalDateOnly = (d) => `${d.getUTCFullYear()}${String(d.getUTCMonth()+1).padStart(2,'0')}${String(d.getUTCDate()).padStart(2,'0')}`;\nconst parseDate = (s) => { if (!s) return null; const d = new Date(s); return isNaN(d.getTime()) ? null : d; };\n\nconst now = new Date();\nconst startDate = parseDate(body.start);\nconst endDate = parseDate(body.end);\nconst isAllDay = body.allDay === true;\n\nconst lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//n8n//Nextcloud//EN','CALSCALE:GREGORIAN','BEGIN:VEVENT',`UID:n8n-event-${eventId}`,`DTSTAMP:${formatICalDate(now)}`];\nif (body.title) lines.push(`SUMMARY:${body.title}`);\nif (startDate) lines.push(isAllDay ? `DTSTART;VALUE=DATE:${formatICalDateOnly(startDate)}` : `DTSTART:${formatICalDate(startDate)}`);\nif (endDate) lines.push(isAllDay ? `DTEND;VALUE=DATE:${formatICalDateOnly(endDate)}` : `DTEND:${formatICalDate(endDate)}`);\nelse if (startDate && !isAllDay) lines.push(`DTEND:${formatICalDate(new Date(startDate.getTime() + 3600000))}`);\nif (body.description) lines.push(`DESCRIPTION:${body.description}`);\nif (body.location) lines.push(`LOCATION:${body.location}`);\nif (body.status) { const m = {'tentative':'TENTATIVE','confirmed':'CONFIRMED','cancelled':'CANCELLED'}; lines.push(`STATUS:${m[body.status]||body.status}`); } else lines.push('STATUS:CONFIRMED');\nif (body.transparency) { const m = {'busy':'OPAQUE','free':'TRANSPARENT'}; lines.push(`TRANSP:${m[body.transparency]||body.transparency}`); } else lines.push('TRANSP:OPAQUE');\nif (body.priority !== undefined) lines.push(`PRIORITY:${Math.min(9,Math.max(1,parseInt(body.priority)))}`);\nif (body.categories) lines.push(`CATEGORIES:${Array.isArray(body.categories)?body.categories.join(','):body.categories}`);\nif (body.recurrence) lines.push(`RRULE:${body.recurrence}`);\nlines.push('BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:Reminder','TRIGGER:-PT15M','END:VALARM','SEQUENCE:0','END:VEVENT','END:VCALENDAR');\n\nconst nextcloudUrl = 'https://cloud.tal.ahmed-rezk.com';\nconst nextcloudUser = 'admin';\nconst auth = Buffer.from(`${nextcloudUser}:4EMsB-kQLNn-YdnCC-9Dd6Z-GA9jj`).toString('base64');\nconst eventUrl = `${nextcloudUrl}/remote.php/dav/calendars/${nextcloudUser}/${calendarName}/${eventId}.ics`;\n\ntry {\n  const response = await fetch(eventUrl, { method: 'PUT', headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'text/calendar' }, body: lines.join('\\r\\n') });\n  return [{ json: { success: response.ok, message: response.ok ? 'Event created!' : 'Failed', event: { title: body.title, start: body.start, end: body.end, uid: `n8n-event-${eventId}` } } }];\n} catch (error) { return [{ json: { success: false, error: error.message } }]; }"
+        "jsCode": "const xml = $input.first().json.data || '';\nconst events = [];\nconst calDataMatches = xml.match(/<cal:calendar-data[^>]*>([\\s\\S]*?)<\\/cal:calendar-data>/gi) || [];\nfor (const calDataMatch of calDataMatches) {\n  const calData = calDataMatch.replace(/<[^>]*>/g, '');\n  const veventMatch = calData.match(/BEGIN:VEVENT([\\s\\S]*?)END:VEVENT/);\n  if (!veventMatch) continue;\n  const vevent = veventMatch[0];\n  const extract = (tag) => { const m = vevent.match(new RegExp(`${tag}:(.*)`, 'i')); return m ? m[1].trim() : null; };\n  const dtstart = extract('DTSTART');\n  const isAllDay = dtstart && !dtstart.includes('T');\n  const parseICalDate = (d) => { if (!d) return null; d = d.replace(/Z$/, ''); if (d.length === 8) return `${d.substring(0,4)}-${d.substring(4,6)}-${d.substring(6,8)}`; return `${d.substring(0,4)}-${d.substring(4,6)}-${d.substring(6,8)}T${d.substring(9,11)}:${d.substring(11,13)}:${d.substring(13,15)}Z`; };\n  events.push({ uid: extract('UID'), title: extract('SUMMARY') || 'Untitled', description: extract('DESCRIPTION'), start: parseICalDate(dtstart), end: parseICalDate(extract('DTEND')), allDay: isAllDay, location: extract('LOCATION'), status: extract('STATUS') || 'CONFIRMED', priority: extract('PRIORITY') ? parseInt(extract('PRIORITY')) : null, categories: extract('CATEGORIES') ? extract('CATEGORIES').split(',').map(c => c.trim()) : [], recurrence: extract('RRULE'), calendar: 'personal' });\n}\nreturn [{ json: { success: true, events, count: events.length } }];"
+      },
+      "id": "parse-fetch",
+      "name": "Parse Fetch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1150, 100]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://cloud.tal.ahmed-rezk.com/remote.php/dav/calendars/admin/personal/{{ Date.now() }}.ics",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/calendar",
+        "body": "={{ $('Set Config').first().json.body.icsData || 'BEGIN:VCALENDAR\\r\\nVERSION:2.0\\r\\nPRODID:-//n8n//Nextcloud//EN\\r\\nBEGIN:VEVENT\\r\\nUID:n8n-event-{{ Date.now() }}\\r\\nDTSTAMP:{{ $now.toFormat(\"yyyyMMdd\\'T\\'HHmmss\\'Z\\'\") }}\\r\\nSUMMARY:{{ $json.body.title }}\\r\\nEND:VEVENT\\r\\nEND:VCALENDAR' }}",
+        "options": {}
       },
       "id": "create-event",
       "name": "Create Event",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [930, 300]
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [930, 300],
+      "credentials": { "httpBasicAuth": { "id": "YOUR_CREDENTIAL_ID", "name": "Nextcloud API" } },
+      "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const body = $('Set Config').first().json.body;\nif (!body.eventUid) return [{ json: { success: false, message: 'eventUid required' } }];\nconst calendarName = body.calendar || 'personal';\nconst nextcloudUrl = 'https://cloud.tal.ahmed-rezk.com';\nconst nextcloudUser = 'admin';\nconst auth = Buffer.from(`${nextcloudUser}:4EMsB-kQLNn-YdnCC-9Dd6Z-GA9jj`).toString('base64');\n\nconst formatICalDate = (d) => { const pad = (n) => String(n).padStart(2,'0'); return `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`; };\nconst parseDate = (s) => { if (!s) return null; const d = new Date(s); return isNaN(d.getTime()) ? null : d; };\nconst now = new Date();\nconst startDate = parseDate(body.start);\nconst endDate = parseDate(body.end);\nconst sequence = (body.sequence || 0) + 1;\n\nconst lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//n8n//Nextcloud//EN','CALSCALE:GREGORIAN','BEGIN:VEVENT',`UID:${body.eventUid}`,`DTSTAMP:${formatICalDate(now)}`];\nif (body.title !== undefined) lines.push(`SUMMARY:${body.title}`);\nif (startDate) lines.push(`DTSTART:${formatICalDate(startDate)}`);\nif (endDate) lines.push(`DTEND:${formatICalDate(endDate)}`);\nif (body.description !== undefined) lines.push(`DESCRIPTION:${body.description}`);\nif (body.location !== undefined) lines.push(`LOCATION:${body.location}`);\nif (body.status) { const m = {'tentative':'TENTATIVE','confirmed':'CONFIRMED','cancelled':'CANCELLED'}; lines.push(`STATUS:${m[body.status]||body.status}`); }\nif (body.categories) lines.push(`CATEGORIES:${Array.isArray(body.categories)?body.categories.join(','):body.categories}`);\nlines.push(`SEQUENCE:${sequence}`,'END:VEVENT','END:VCALENDAR');\n\nconst eventUrl = `${nextcloudUrl}/remote.php/dav/calendars/${nextcloudUser}/${calendarName}/${body.eventUid}.ics`;\ntry {\n  const response = await fetch(eventUrl, { method: 'PUT', headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'text/calendar' }, body: lines.join('\\r\\n') });\n  return [{ json: { success: response.ok, message: response.ok ? 'Event updated!' : 'Failed', event: { uid: body.eventUid, title: body.title, sequence } } }];\n} catch (error) { return [{ json: { success: false, error: error.message } }]; }"
+        "jsCode": "const body = $('Set Config').first().json.body;\nreturn [{ json: { success: true, message: 'Event created!', event: { title: body.title, start: body.start, end: body.end } } }];"
       },
-      "id": "update-event",
-      "name": "Update Event",
+      "id": "format-create",
+      "name": "Format Create",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [930, 500]
+      "position": [1150, 300]
     },
     {
       "parameters": {
-        "jsCode": "const body = $('Set Config').first().json.body;\nif (!body.eventUid) return [{ json: { success: false, message: 'eventUid required' } }];\nconst calendarName = body.calendar || 'personal';\nconst nextcloudUrl = 'https://cloud.tal.ahmed-rezk.com';\nconst nextcloudUser = 'admin';\nconst auth = Buffer.from(`${nextcloudUser}:4EMsB-kQLNn-YdnCC-9Dd6Z-GA9jj`).toString('base64');\nconst eventUrl = `${nextcloudUrl}/remote.php/dav/calendars/${nextcloudUser}/${calendarName}/${body.eventUid}.ics`;\n\ntry {\n  const response = await fetch(eventUrl, { method: 'DELETE', headers: { 'Authorization': `Basic ${auth}` } });\n  return [{ json: { success: response.ok || response.status === 204, message: 'Event deleted!', eventUid: body.eventUid } }];\n} catch (error) { return [{ json: { success: false, error: error.message } }]; }"
+        "method": "DELETE",
+        "url": "=https://cloud.tal.ahmed-rezk.com/remote.php/dav/calendars/admin/personal/{{ $('Set Config').first().json.body.eventUid }}.ics",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
       },
       "id": "delete-event",
       "name": "Delete Event",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [930, 700]
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [930, 500],
+      "credentials": { "httpBasicAuth": { "id": "YOUR_CREDENTIAL_ID", "name": "Nextcloud API" } },
+      "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "return [{ json: { success: false, message: 'Invalid action. Use: fetch, create, update, delete' } }];"
+        "jsCode": "return [{ json: { success: true, message: 'Event deleted!', eventUid: $('Set Config').first().json.body.eventUid } }];"
+      },
+      "id": "format-delete",
+      "name": "Format Delete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1150, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { success: false, message: 'Invalid action. Use: fetch, create, delete' } }];"
       },
       "id": "format-error",
       "name": "Error",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [930, 900]
+      "position": [930, 700]
     }
   ],
   "connections": {
     "Webhook": { "main": [[{ "node": "Set Config", "type": "main", "index": 0 }]] },
     "Set Config": { "main": [[{ "node": "Switch Action", "type": "main", "index": 0 }]] },
-    "Switch Action": {
-      "main": [
-        [{ "node": "Fetch Events", "type": "main", "index": 0 }],
-        [{ "node": "Create Event", "type": "main", "index": 0 }],
-        [{ "node": "Update Event", "type": "main", "index": 0 }],
-        [{ "node": "Delete Event", "type": "main", "index": 0 }],
-        [{ "node": "Error", "type": "main", "index": 0 }]
-      ]
-    }
+    "Switch Action": { "main": [[{ "node": "Fetch Events", "type": "main", "index": 0 }], [{ "node": "Create Event", "type": "main", "index": 0 }], [{ "node": "Update Event", "type": "main", "index": 0 }], [{ "node": "Delete Event", "type": "main", "index": 0 }], [{ "node": "Error", "type": "main", "index": 0 }]] },
+    "Fetch Events": { "main": [[{ "node": "Parse Fetch", "type": "main", "index": 0 }]] },
+    "Create Event": { "main": [[{ "node": "Format Create", "type": "main", "index": 0 }]] },
+    "Delete Event": { "main": [[{ "node": "Format Delete", "type": "main", "index": 0 }]] }
   },
   "settings": { "executionOrder": "v1" },
   "staticData": null,
