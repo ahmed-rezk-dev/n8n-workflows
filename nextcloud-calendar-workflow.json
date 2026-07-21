@@ -49,31 +49,13 @@
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "https://cloud.tal.ahmed-rezk.com/remote.php/dav/calendars/admin/personal/",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpBasicAuth",
-        "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "Depth", "value": "1" }] },
-        "options": { "response": { "response": { "responseFormat": "text" } } }
+        "jsCode": "const nextcloudUrl = 'https://cloud.tal.ahmed-rezk.com';\nconst nextcloudUser = 'admin';\nconst calendarName = 'personal';\nconst auth = Buffer.from('admin:4EMsB-kQLNn-YdnCC-9Dd6Z-GA9jj').toString('base64');\n\ntry {\n  const response = await this.helpers.httpRequest({\n    method: 'PROPFIND',\n    url: `${nextcloudUrl}/remote.php/dav/calendars/${nextcloudUser}/${calendarName}/`,\n    headers: {\n      'Authorization': `Basic ${auth}`,\n      'Content-Type': 'application/xml',\n      'Depth': '1'\n    },\n    body: '<?xml version=\"1.0\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:getetag/></d:prop></d:propfind>',\n    returnFullResponse: true\n  });\n  \n  const xml = response.body || response.data || '';\n  const files = [];\n  const hrefMatches = xml.match(/<d:href>([^<]*\\.ics)<\\/d:href>/gi) || [];\n  for (const m of hrefMatches) {\n    const href = m.match(/<d:href>([^<]*)<\\/d:href>/i)[1];\n    const filename = href.split('/').pop().replace('.ics', '');\n    files.push({ filename, href });\n  }\n  return [{ json: { success: true, files, count: files.length } }];\n} catch (error) {\n  return [{ json: { success: false, error: error.message } }];\n}"
       },
-      "id": "list-files",
-      "name": "List Calendar Files",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [930, 100],
-      "credentials": { "httpBasicAuth": { "id": "YOUR_CREDENTIAL_ID", "name": "Nextcloud API" } },
-      "continueOnFail": true
-    },
-    {
-      "parameters": {
-        "jsCode": "const xml = $input.first().json.data || '';\nconst fileMatches = xml.match(/<d:href>([^<]*\\.ics)<\\/d:href>/gi) || [];\nconst files = fileMatches.map(m => m.match(/<d:href>([^<]*)<\\/d:href>/i)[1]);\nreturn [{ json: { files, count: files.length } }];"
-      },
-      "id": "parse-files",
-      "name": "Parse Files",
+      "id": "fetch-events",
+      "name": "Fetch Events",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1150, 100]
+      "position": [930, 100]
     },
     {
       "parameters": {
@@ -145,8 +127,7 @@
   "connections": {
     "Webhook": { "main": [[{ "node": "Set Config", "type": "main", "index": 0 }]] },
     "Set Config": { "main": [[{ "node": "Switch Action", "type": "main", "index": 0 }]] },
-    "Switch Action": { "main": [[{ "node": "List Calendar Files", "type": "main", "index": 0 }], [{ "node": "Create Event", "type": "main", "index": 0 }], [{ "node": "Delete Event", "type": "main", "index": 0 }], [{ "node": "Error", "type": "main", "index": 0 }]] },
-    "List Calendar Files": { "main": [[{ "node": "Parse Files", "type": "main", "index": 0 }]] },
+    "Switch Action": { "main": [[{ "node": "Fetch Events", "type": "main", "index": 0 }], [{ "node": "Create Event", "type": "main", "index": 0 }], [{ "node": "Delete Event", "type": "main", "index": 0 }], [{ "node": "Error", "type": "main", "index": 0 }]] },
     "Create Event": { "main": [[{ "node": "Format Create", "type": "main", "index": 0 }]] },
     "Delete Event": { "main": [[{ "node": "Format Delete", "type": "main", "index": 0 }]] }
   },
