@@ -1,85 +1,119 @@
-# n8n Homelab Setup
+# n8n Nextcloud Integration
 
-Self-hosted workflow automation with n8n and PostgreSQL.
+Self-hosted workflow automation with n8n, Nextcloud Tasks, and Nextcloud Calendar.
 
-## Quick Start
+## 🚀 Quick Start
 
-1. **Edit the `.env` file** with your preferred credentials:
+1. **Configure environment:**
    ```bash
-   nano .env
+   cp .env.example .env
+   nano .env  # Add your credentials
    ```
 
-2. **Start the services**:
+2. **Start n8n:**
    ```bash
    docker compose up -d
    ```
 
-3. **Access n8n** at: http://localhost:5678
+3. **Access n8n:** http://localhost:5678
 
-## Configuration
+4. **Import workflows:**
+   - `nextcloud-tasks-workflow.json` - Tasks management
+   - `nextcloud-calendar-workflow.json` - Calendar management
 
-### Environment Variables (`.env`)
+5. **Set credentials:**
+   - Go to Credentials → Add → HTTP Basic Auth
+   - Enter your Nextcloud username and app password
+   - Select this credential in the workflow HTTP Request nodes
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `POSTGRES_USER` | PostgreSQL username | `n8n` |
-| `POSTGRES_PASSWORD` | PostgreSQL password | `change_me_to_a_strong_password` |
-| `POSTGRES_DB` | PostgreSQL database name | `n8n` |
-| `N8N_USER` | n8n login username | `admin` |
-| `N8N_PASSWORD` | n8n login password | `change_me_to_a_strong_password` |
-| `N8N_HOST` | n8n hostname/IP | `localhost` |
-| `TZ` | Timezone | `America/New_York` |
+## 📋 Workflows
 
-### For Remote Access
+### Tasks Manager (`/webhook/nextcloud-tasks`)
 
-If accessing from another device on your network:
-1. Change `N8N_HOST` to your server's IP address (e.g., `192.168.1.100`)
-2. Access via `http://192.168.1.100:5678`
+| Action | Description | Required Fields |
+|--------|-------------|-----------------|
+| `fetch` | List all tasks | - |
+| `create` | Create a task | `title` |
+| `update` | Update a task | `taskUid` |
+| `delete` | Delete a task | `taskUid` |
 
-### HTTPS Setup (Optional)
-
-For production use, consider adding a reverse proxy (Traefik or Nginx) in front of n8n for SSL/TLS.
-
-## Management Commands
-
-```bash
-# Start services
-docker compose up -d
-
-# Stop services
-docker compose down
-
-# View logs
-docker compose logs -f
-
-# View n8n logs only
-docker compose logs -f n8n
-
-# Restart services
-docker compose restart
-
-# Update to latest version
-docker compose pull
-docker compose up -d
-
-# Backup database
-docker exec n8n-postgres pg_dump -U n8n n8n > backup.sql
-
-# Restore database
-docker exec -i n8n-postgres psql -U n8n n8n < backup.sql
+**Create task with all properties:**
+```json
+{
+  "action": "create",
+  "title": "Buy groceries",
+  "description": "Milk, eggs, bread",
+  "due": "2025-01-20T18:00:00",
+  "priority": 3,
+  "status": "in-progress",
+  "percentComplete": 50,
+  "categories": ["personal", "shopping"]
+}
 ```
 
-## Data Storage
+### Calendar Manager (`/webhook/nextcloud-calendar`)
 
-- **n8n data**: Docker volume `n8n-setup_n8n_data`
-- **PostgreSQL data**: Docker volume `n8n-setup_postgres_data`
-- **Local files**: `./local-files` directory (for file operations in workflows)
+| Action | Description | Required Fields |
+|--------|-------------|-----------------|
+| `fetch` | List all events | - |
+| `create` | Create an event | `title` |
+| `delete` | Delete an event | `eventUid` |
 
-## Troubleshooting
+**Create event:**
+```json
+{
+  "action": "create",
+  "title": "Team Meeting",
+  "start": "2025-01-20T09:00:00",
+  "end": "2025-01-20T10:00:00",
+  "location": "Conference Room"
+}
+```
 
-1. **Check container status**: `docker compose ps`
-2. **View logs**: `docker compose logs`
-3. **Reset everything** (deletes all data):
-   ```bash
-   docker compose down -v
-   ```
+## 📚 Documentation
+
+- [Nextcloud Task Properties](nextcloud-task-properties.md)
+- [Nextcloud Calendar Properties](nextcloud-calendar-properties.md)
+- [Nextcloud Setup Guide](nextcloud-setup-guide.md)
+
+## 🔧 Management
+
+```bash
+# Start
+docker compose up -d
+
+# Stop
+docker compose down
+
+# Restart
+docker compose restart
+
+# View logs
+docker compose logs -f n8n
+
+# Update
+docker compose pull && docker compose up -d
+```
+
+## 🐛 Troubleshooting
+
+- **401 Unauthorized:** Check app password in Nextcloud
+- **Webhook not found:** Ensure workflow is activated
+- **Connection refused:** Check n8n is running (`docker compose ps`)
+
+## 🔐 Security Notes
+
+- Use strong passwords in `.env`
+- Create app passwords in Nextcloud (Settings → Security)
+- Consider adding HTTPS with a reverse proxy for production
+
+## 📦 What's Included
+
+- Docker Compose setup (n8n + PostgreSQL)
+- Nextcloud Tasks workflow (CRUD)
+- Nextcloud Calendar workflow (CRUD)
+- Documentation and examples
+
+---
+
+**Repository:** https://github.com/ahmed-rezk-dev/n8n-workflows
