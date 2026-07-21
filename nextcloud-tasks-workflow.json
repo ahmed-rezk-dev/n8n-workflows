@@ -12,7 +12,10 @@
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [250, 300],
+      "position": [
+        250,
+        300
+      ],
       "webhookId": "tasks-manager"
     },
     {
@@ -30,6 +33,18 @@
               "name": "nextcloudUser",
               "value": "admin",
               "type": "string"
+            },
+            {
+              "id": "action",
+              "name": "action",
+              "value": "={{ $(\"Webhook\").first().json.body.action }}",
+              "type": "string"
+            },
+            {
+              "id": "webhook-body",
+              "name": "webhookBody",
+              "value": "={{ $(\"Webhook\").first().json.body }}",
+              "type": "object"
             }
           ]
         }
@@ -38,7 +53,10 @@
       "name": "Set Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [470, 300]
+      "position": [
+        470,
+        300
+      ]
     },
     {
       "parameters": {
@@ -53,7 +71,7 @@
                 },
                 "conditions": [
                   {
-                    "leftValue": "={{ $json.body.action }}",
+                    "leftValue": "={{ $json.action }}",
                     "rightValue": "fetch",
                     "operator": {
                       "type": "string",
@@ -75,7 +93,7 @@
                 },
                 "conditions": [
                   {
-                    "leftValue": "={{ $json.body.action }}",
+                    "leftValue": "={{ $json.action }}",
                     "rightValue": "create",
                     "operator": {
                       "type": "string",
@@ -97,7 +115,7 @@
                 },
                 "conditions": [
                   {
-                    "leftValue": "={{ $json.body.action }}",
+                    "leftValue": "={{ $json.action }}",
                     "rightValue": "update",
                     "operator": {
                       "type": "string",
@@ -119,7 +137,7 @@
                 },
                 "conditions": [
                   {
-                    "leftValue": "={{ $json.body.action }}",
+                    "leftValue": "={{ $json.action }}",
                     "rightValue": "delete",
                     "operator": {
                       "type": "string",
@@ -142,7 +160,10 @@
       "name": "Switch Action",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [690, 300]
+      "position": [
+        690,
+        300
+      ]
     },
     {
       "parameters": {
@@ -171,7 +192,10 @@
       "name": "Fetch Tasks",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [930, 100],
+      "position": [
+        930,
+        100
+      ],
       "credentials": {
         "httpBasicAuth": {
           "id": "YOUR_CREDENTIAL_ID",
@@ -188,17 +212,23 @@
       "name": "Parse Fetch",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1150, 100]
+      "position": [
+        1150,
+        100
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Build ICS for create\nconst body = $('Set Config').first().json.nextcloudUrl ? $('Webhook').first().json.body : $('Webhook').first().json.body;\nconst taskId = Date.now();\n\nconst formatICalDate = (d) => {\n  const year = d.getUTCFullYear();\n  const month = String(d.getUTCMonth() + 1).padStart(2, '0');\n  const day = String(d.getUTCDate()).padStart(2, '0');\n  const hours = String(d.getUTCHours()).padStart(2, '0');\n  const minutes = String(d.getUTCMinutes()).padStart(2, '0');\n  const seconds = String(d.getUTCSeconds()).padStart(2, '0');\n  return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;\n};\n\nconst parseDate = (dateStr) => {\n  if (!dateStr) return null;\n  const d = new Date(dateStr);\n  return isNaN(d.getTime()) ? null : d;\n};\n\nconst now = new Date();\nconst lines = [\n  'BEGIN:VCALENDAR',\n  'VERSION:2.0',\n  'PRODID:-//n8n//Nextcloud//EN',\n  'BEGIN:VTODO',\n  `UID:n8n-task-${taskId}`,\n  `DTSTAMP:${formatICalDate(now)}`\n];\n\nif (body.title) lines.push(`SUMMARY:${body.title}`);\nif (body.description) lines.push(`DESCRIPTION:${body.description}`);\nif (body.due) { const d = parseDate(body.due); if (d) lines.push(`DUE:${formatICalDate(d)}`); }\nif (body.startDate) { const d = parseDate(body.startDate); if (d) lines.push(`DTSTART:${formatICalDate(d)}`); }\nif (body.completed) { const d = parseDate(body.completed); if (d) lines.push(`COMPLETED:${formatICalDate(d)}`); }\n\nif (body.status) {\n  const statusMap = { 'todo': 'NEEDS-ACTION', 'in-progress': 'IN-PROCESS', 'completed': 'COMPLETED', 'cancelled': 'CANCELLED' };\n  lines.push(`STATUS:${statusMap[body.status] || body.status}`);\n} else {\n  lines.push('STATUS:NEEDS-ACTION');\n}\n\nif (body.priority !== undefined) lines.push(`PRIORITY:${Math.min(9, Math.max(1, parseInt(body.priority)))}`);\nif (body.percentComplete !== undefined) lines.push(`PERCENT-COMPLETE:${Math.min(100, Math.max(0, parseInt(body.percentComplete)))}`);\nif (body.categories) lines.push(`CATEGORIES:${Array.isArray(body.categories) ? body.categories.join(',') : body.categories}`);\nif (body.parentTaskUid) lines.push(`RELATED-TO;RELTYPE=PARENT:${body.parentTaskUid}`);\nif (body.duration) lines.push(`DURATION:${body.duration}`);\nif (body.recurrence) lines.push(`RRULE:${body.recurrence}`);\nif (body.location) lines.push(`LOCATION:${body.location}`);\nif (body.url) lines.push(`URL:${body.url}`);\n\nlines.push('END:VTODO', 'END:VCALENDAR');\n\nreturn [{ json: { icsBody: lines.join('\\r\\n'), nextcloudUrl: $('Set Config').first().json.nextcloudUrl, nextcloudUser: $('Set Config').first().json.nextcloudUser } }];"
+        "jsCode": "// Build ICS for create\nconst body = $('Set Config').first().json.nextcloudUrl ? $('Set Config').first().json.webhookBody : $('Set Config').first().json.webhookBody;\nconst taskId = Date.now();\n\nconst formatICalDate = (d) => {\n  const year = d.getUTCFullYear();\n  const month = String(d.getUTCMonth() + 1).padStart(2, '0');\n  const day = String(d.getUTCDate()).padStart(2, '0');\n  const hours = String(d.getUTCHours()).padStart(2, '0');\n  const minutes = String(d.getUTCMinutes()).padStart(2, '0');\n  const seconds = String(d.getUTCSeconds()).padStart(2, '0');\n  return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;\n};\n\nconst parseDate = (dateStr) => {\n  if (!dateStr) return null;\n  const d = new Date(dateStr);\n  return isNaN(d.getTime()) ? null : d;\n};\n\nconst now = new Date();\nconst lines = [\n  'BEGIN:VCALENDAR',\n  'VERSION:2.0',\n  'PRODID:-//n8n//Nextcloud//EN',\n  'BEGIN:VTODO',\n  `UID:n8n-task-${taskId}`,\n  `DTSTAMP:${formatICalDate(now)}`\n];\n\nif (body.title) lines.push(`SUMMARY:${body.title}`);\nif (body.description) lines.push(`DESCRIPTION:${body.description}`);\nif (body.due) { const d = parseDate(body.due); if (d) lines.push(`DUE:${formatICalDate(d)}`); }\nif (body.startDate) { const d = parseDate(body.startDate); if (d) lines.push(`DTSTART:${formatICalDate(d)}`); }\nif (body.completed) { const d = parseDate(body.completed); if (d) lines.push(`COMPLETED:${formatICalDate(d)}`); }\n\nif (body.status) {\n  const statusMap = { 'todo': 'NEEDS-ACTION', 'in-progress': 'IN-PROCESS', 'completed': 'COMPLETED', 'cancelled': 'CANCELLED' };\n  lines.push(`STATUS:${statusMap[body.status] || body.status}`);\n} else {\n  lines.push('STATUS:NEEDS-ACTION');\n}\n\nif (body.priority !== undefined) lines.push(`PRIORITY:${Math.min(9, Math.max(1, parseInt(body.priority)))}`);\nif (body.percentComplete !== undefined) lines.push(`PERCENT-COMPLETE:${Math.min(100, Math.max(0, parseInt(body.percentComplete)))}`);\nif (body.categories) lines.push(`CATEGORIES:${Array.isArray(body.categories) ? body.categories.join(',') : body.categories}`);\nif (body.parentTaskUid) lines.push(`RELATED-TO;RELTYPE=PARENT:${body.parentTaskUid}`);\nif (body.duration) lines.push(`DURATION:${body.duration}`);\nif (body.recurrence) lines.push(`RRULE:${body.recurrence}`);\nif (body.location) lines.push(`LOCATION:${body.location}`);\nif (body.url) lines.push(`URL:${body.url}`);\n\nlines.push('END:VTODO', 'END:VCALENDAR');\n\nreturn [{ json: { icsBody: lines.join('\\r\\n'), nextcloudUrl: $('Set Config').first().json.nextcloudUrl, nextcloudUser: $('Set Config').first().json.nextcloudUser } }];"
       },
       "id": "build-create",
       "name": "Build Create",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [930, 300]
+      "position": [
+        930,
+        300
+      ]
     },
     {
       "parameters": {
@@ -216,7 +246,10 @@
       "name": "Create Task",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1150, 300],
+      "position": [
+        1150,
+        300
+      ],
       "credentials": {
         "httpBasicAuth": {
           "id": "YOUR_CREDENTIAL_ID",
@@ -227,23 +260,29 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $('Webhook').first().json.body;\nreturn [{ json: { success: true, message: 'Task created!', task: { title: body.title, description: body.description || null, due: body.due || null, priority: body.priority || null, status: body.status || 'NEEDS-ACTION', categories: body.categories || [] } } }];"
+        "jsCode": "const body = $('Set Config').first().json.webhookBody;\nreturn [{ json: { success: true, message: 'Task created!', task: { title: body.title, description: body.description || null, due: body.due || null, priority: body.priority || null, status: body.status || 'NEEDS-ACTION', categories: body.categories || [] } } }];"
       },
       "id": "format-create",
       "name": "Format Create",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1370, 300]
+      "position": [
+        1370,
+        300
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Build ICS for update\nconst body = $('Webhook').first().json.body;\nif (!body.taskUid) return [{ json: { success: false, message: 'taskUid is required' } }];\n\nconst formatICalDate = (d) => {\n  const year = d.getUTCFullYear();\n  const month = String(d.getUTCMonth() + 1).padStart(2, '0');\n  const day = String(d.getUTCDate()).padStart(2, '0');\n  const hours = String(d.getUTCHours()).padStart(2, '0');\n  const minutes = String(d.getUTCMinutes()).padStart(2, '0');\n  const seconds = String(d.getUTCSeconds()).padStart(2, '0');\n  return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;\n};\n\nconst now = new Date();\nconst lines = [\n  'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//n8n//Nextcloud//EN',\n  'BEGIN:VTODO', `UID:${body.taskUid}`, `DTSTAMP:${formatICalDate(now)}`\n];\n\nif (body.title !== undefined) lines.push(`SUMMARY:${body.title}`);\nif (body.description !== undefined) lines.push(`DESCRIPTION:${body.description}`);\nif (body.due) { const d = new Date(body.due); if (!isNaN(d.getTime())) lines.push(`DUE:${formatICalDate(d)}`); }\n\nif (body.status) {\n  const statusMap = { 'todo': 'NEEDS-ACTION', 'in-progress': 'IN-PROCESS', 'completed': 'COMPLETED', 'cancelled': 'CANCELLED' };\n  lines.push(`STATUS:${statusMap[body.status] || body.status}`);\n  if (body.status === 'completed' || body.status === 'COMPLETED') lines.push(`COMPLETED:${formatICalDate(now)}`);\n}\n\nif (body.priority !== undefined) lines.push(`PRIORITY:${Math.min(9, Math.max(1, parseInt(body.priority)))}`);\nif (body.percentComplete !== undefined) lines.push(`PERCENT-COMPLETE:${Math.min(100, Math.max(0, parseInt(body.percentComplete)))}`);\nif (body.categories) lines.push(`CATEGORIES:${Array.isArray(body.categories) ? body.categories.join(',') : body.categories}`);\n\nlines.push('END:VTODO', 'END:VCALENDAR');\n\nconst nextcloudUrl = $('Set Config').first().json.nextcloudUrl;\nconst nextcloudUser = $('Set Config').first().json.nextcloudUser;\n\nreturn [{ json: { icsBody: lines.join('\\r\\n'), taskUrl: `${nextcloudUrl}/remote.php/dav/calendars/${nextcloudUser}/tasks/${body.taskUid}.ics`, taskUid: body.taskUid } }];"
+        "jsCode": "// Build ICS for update\nconst body = $('Set Config').first().json.webhookBody;\nif (!body.taskUid) return [{ json: { success: false, message: 'taskUid is required' } }];\n\nconst formatICalDate = (d) => {\n  const year = d.getUTCFullYear();\n  const month = String(d.getUTCMonth() + 1).padStart(2, '0');\n  const day = String(d.getUTCDate()).padStart(2, '0');\n  const hours = String(d.getUTCHours()).padStart(2, '0');\n  const minutes = String(d.getUTCMinutes()).padStart(2, '0');\n  const seconds = String(d.getUTCSeconds()).padStart(2, '0');\n  return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;\n};\n\nconst now = new Date();\nconst lines = [\n  'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//n8n//Nextcloud//EN',\n  'BEGIN:VTODO', `UID:${body.taskUid}`, `DTSTAMP:${formatICalDate(now)}`\n];\n\nif (body.title !== undefined) lines.push(`SUMMARY:${body.title}`);\nif (body.description !== undefined) lines.push(`DESCRIPTION:${body.description}`);\nif (body.due) { const d = new Date(body.due); if (!isNaN(d.getTime())) lines.push(`DUE:${formatICalDate(d)}`); }\n\nif (body.status) {\n  const statusMap = { 'todo': 'NEEDS-ACTION', 'in-progress': 'IN-PROCESS', 'completed': 'COMPLETED', 'cancelled': 'CANCELLED' };\n  lines.push(`STATUS:${statusMap[body.status] || body.status}`);\n  if (body.status === 'completed' || body.status === 'COMPLETED') lines.push(`COMPLETED:${formatICalDate(now)}`);\n}\n\nif (body.priority !== undefined) lines.push(`PRIORITY:${Math.min(9, Math.max(1, parseInt(body.priority)))}`);\nif (body.percentComplete !== undefined) lines.push(`PERCENT-COMPLETE:${Math.min(100, Math.max(0, parseInt(body.percentComplete)))}`);\nif (body.categories) lines.push(`CATEGORIES:${Array.isArray(body.categories) ? body.categories.join(',') : body.categories}`);\n\nlines.push('END:VTODO', 'END:VCALENDAR');\n\nconst nextcloudUrl = $('Set Config').first().json.nextcloudUrl;\nconst nextcloudUser = $('Set Config').first().json.nextcloudUser;\n\nreturn [{ json: { icsBody: lines.join('\\r\\n'), taskUrl: `${nextcloudUrl}/remote.php/dav/calendars/${nextcloudUser}/tasks/${body.taskUid}.ics`, taskUid: body.taskUid } }];"
       },
       "id": "build-update",
       "name": "Build Update",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [930, 500]
+      "position": [
+        930,
+        500
+      ]
     },
     {
       "parameters": {
@@ -261,7 +300,10 @@
       "name": "Update Task",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1150, 500],
+      "position": [
+        1150,
+        500
+      ],
       "credentials": {
         "httpBasicAuth": {
           "id": "YOUR_CREDENTIAL_ID",
@@ -272,23 +314,29 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $('Webhook').first().json.body;\nreturn [{ json: { success: true, message: 'Task updated!', task: { uid: body.taskUid, title: body.title || null, status: body.status || null, priority: body.priority || null } } }];"
+        "jsCode": "const body = $('Set Config').first().json.webhookBody;\nreturn [{ json: { success: true, message: 'Task updated!', task: { uid: body.taskUid, title: body.title || null, status: body.status || null, priority: body.priority || null } } }];"
       },
       "id": "format-update",
       "name": "Format Update",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1370, 500]
+      "position": [
+        1370,
+        500
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const body = $('Webhook').first().json.body;\nif (!body.taskUid) return [{ json: { success: false, message: 'taskUid is required' } }];\n\nconst nextcloudUrl = $('Set Config').first().json.nextcloudUrl;\nconst nextcloudUser = $('Set Config').first().json.nextcloudUser;\n\nreturn [{ json: { taskUrl: `${nextcloudUrl}/remote.php/dav/calendars/${nextcloudUser}/tasks/${body.taskUid}.ics`, taskUid: body.taskUid } }];"
+        "jsCode": "const body = $('Set Config').first().json.webhookBody;\nif (!body.taskUid) return [{ json: { success: false, message: 'taskUid is required' } }];\n\nconst nextcloudUrl = $('Set Config').first().json.nextcloudUrl;\nconst nextcloudUser = $('Set Config').first().json.nextcloudUser;\n\nreturn [{ json: { taskUrl: `${nextcloudUrl}/remote.php/dav/calendars/${nextcloudUser}/tasks/${body.taskUid}.ics`, taskUid: body.taskUid } }];"
       },
       "id": "build-delete",
       "name": "Build Delete",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [930, 700]
+      "position": [
+        930,
+        700
+      ]
     },
     {
       "parameters": {
@@ -302,7 +350,10 @@
       "name": "Delete Task",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1150, 700],
+      "position": [
+        1150,
+        700
+      ],
       "credentials": {
         "httpBasicAuth": {
           "id": "YOUR_CREDENTIAL_ID",
@@ -313,23 +364,29 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $('Webhook').first().json.body;\nreturn [{ json: { success: true, message: 'Task deleted!', taskUid: body.taskUid } }];"
+        "jsCode": "const body = $('Set Config').first().json.webhookBody;\nreturn [{ json: { success: true, message: 'Task deleted!', taskUid: body.taskUid } }];"
       },
       "id": "format-delete",
       "name": "Format Delete",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1370, 700]
+      "position": [
+        1370,
+        700
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const action = $('Webhook').first().json.body?.action || 'unknown';\nreturn [{ json: { success: false, message: `Invalid action: ${action}. Use fetch, create, update, or delete.` } }];"
+        "jsCode": "const action = $('Set Config').first().json.webhookBody?.action || 'unknown';\nreturn [{ json: { success: false, message: `Invalid action: ${action}. Use fetch, create, update, or delete.` } }];"
       },
       "id": "format-error",
       "name": "Format Error",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [930, 900]
+      "position": [
+        930,
+        900
+      ]
     }
   ],
   "connections": {

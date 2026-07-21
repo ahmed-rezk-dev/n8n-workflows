@@ -12,7 +12,10 @@
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [250, 300],
+      "position": [
+        250,
+        300
+      ],
       "webhookId": "calendar-manager"
     },
     {
@@ -36,6 +39,18 @@
               "name": "defaultCalendar",
               "value": "personal",
               "type": "string"
+            },
+            {
+              "id": "action",
+              "name": "action",
+              "value": "={{ $(\"Webhook\").first().json.body.action }}",
+              "type": "string"
+            },
+            {
+              "id": "webhook-body",
+              "name": "webhookBody",
+              "value": "={{ $(\"Webhook\").first().json.body }}",
+              "type": "object"
             }
           ]
         }
@@ -44,7 +59,10 @@
       "name": "Set Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [470, 300]
+      "position": [
+        470,
+        300
+      ]
     },
     {
       "parameters": {
@@ -52,8 +70,21 @@
           "values": [
             {
               "conditions": {
-                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
-                "conditions": [{ "leftValue": "={{ $json.body.action }}", "rightValue": "fetch", "operator": { "type": "string", "operation": "equals" } }],
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "fetch",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
                 "combinator": "and"
               },
               "renameOutput": true,
@@ -61,8 +92,21 @@
             },
             {
               "conditions": {
-                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
-                "conditions": [{ "leftValue": "={{ $json.body.action }}", "rightValue": "create", "operator": { "type": "string", "operation": "equals" } }],
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "create",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
                 "combinator": "and"
               },
               "renameOutput": true,
@@ -70,8 +114,21 @@
             },
             {
               "conditions": {
-                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
-                "conditions": [{ "leftValue": "={{ $json.body.action }}", "rightValue": "update", "operator": { "type": "string", "operation": "equals" } }],
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "update",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
                 "combinator": "and"
               },
               "renameOutput": true,
@@ -79,8 +136,21 @@
             },
             {
               "conditions": {
-                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
-                "conditions": [{ "leftValue": "={{ $json.body.action }}", "rightValue": "delete", "operator": { "type": "string", "operation": "equals" } }],
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "delete",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
                 "combinator": "and"
               },
               "renameOutput": true,
@@ -88,23 +158,31 @@
             }
           ]
         },
-        "options": { "fallbackOutput": "extra" }
+        "options": {
+          "fallbackOutput": "extra"
+        }
       },
       "id": "switch-action",
       "name": "Switch Action",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [690, 300]
+      "position": [
+        690,
+        300
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Build fetch URL\nconst body = $('Webhook').first().json.body || {};\nconst calendarName = body.calendar || $('Set Config').first().json.defaultCalendar;\nconst nextcloudUrl = $('Set Config').first().json.nextcloudUrl;\nconst nextcloudUser = $('Set Config').first().json.nextcloudUser;\n\nlet timeRange = '';\nif (body.startDate || body.endDate) {\n  const formatICalDate = (d) => {\n    const year = d.getUTCFullYear();\n    const month = String(d.getUTCMonth() + 1).padStart(2, '0');\n    const day = String(d.getUTCDate()).padStart(2, '0');\n    const hours = String(d.getUTCHours()).padStart(2, '0');\n    const minutes = String(d.getUTCMinutes()).padStart(2, '0');\n    const seconds = String(d.getUTCSeconds()).padStart(2, '0');\n    return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;\n  };\n  const start = body.startDate ? new Date(body.startDate) : new Date();\n  const end = body.endDate ? new Date(body.endDate) : new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);\n  timeRange = `?start=${formatICalDate(start)}&end=${formatICalDate(end)}`;\n}\n\nreturn [{ json: { url: `${nextcloudUrl}/remote.php/dav/calendars/${nextcloudUser}/${calendarName}${timeRange}`, calendarName } }];"
+        "jsCode": "// Build fetch URL\nconst body = $('Set Config').first().json.webhookBody || {};\nconst calendarName = body.calendar || $('Set Config').first().json.defaultCalendar;\nconst nextcloudUrl = $('Set Config').first().json.nextcloudUrl;\nconst nextcloudUser = $('Set Config').first().json.nextcloudUser;\n\nlet timeRange = '';\nif (body.startDate || body.endDate) {\n  const formatICalDate = (d) => {\n    const year = d.getUTCFullYear();\n    const month = String(d.getUTCMonth() + 1).padStart(2, '0');\n    const day = String(d.getUTCDate()).padStart(2, '0');\n    const hours = String(d.getUTCHours()).padStart(2, '0');\n    const minutes = String(d.getUTCMinutes()).padStart(2, '0');\n    const seconds = String(d.getUTCSeconds()).padStart(2, '0');\n    return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;\n  };\n  const start = body.startDate ? new Date(body.startDate) : new Date();\n  const end = body.endDate ? new Date(body.endDate) : new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);\n  timeRange = `?start=${formatICalDate(start)}&end=${formatICalDate(end)}`;\n}\n\nreturn [{ json: { url: `${nextcloudUrl}/remote.php/dav/calendars/${nextcloudUser}/${calendarName}${timeRange}`, calendarName } }];"
       },
       "id": "build-fetch-url",
       "name": "Build Fetch URL",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [930, 100]
+      "position": [
+        930,
+        100
+      ]
     },
     {
       "parameters": {
@@ -113,15 +191,36 @@
         "authentication": "genericCredentialType",
         "genericAuthType": "httpBasicAuth",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "Depth", "value": "1" }] },
-        "options": { "response": { "response": { "responseFormat": "text" } } }
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Depth",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
       },
       "id": "fetch-events",
       "name": "Fetch Events",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1150, 100],
-      "credentials": { "httpBasicAuth": { "id": "YOUR_CREDENTIAL_ID", "name": "Nextcloud API" } },
+      "position": [
+        1150,
+        100
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Nextcloud API"
+        }
+      },
       "continueOnFail": true
     },
     {
@@ -132,17 +231,23 @@
       "name": "Parse Fetch",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1370, 100]
+      "position": [
+        1370,
+        100
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Build ICS for create event\nconst body = $('Webhook').first().json.body;\nconst eventId = Date.now();\nconst calendarName = body.calendar || $('Set Config').first().json.defaultCalendar;\n\nconst formatICalDate = (d) => {\n  const pad = (n) => String(n).padStart(2, '0');\n  return `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`;\n};\nconst formatICalDateOnly = (d) => `${d.getUTCFullYear()}${String(d.getUTCMonth()+1).padStart(2,'0')}${String(d.getUTCDate()).padStart(2,'0')}`;\nconst parseDate = (s) => { if (!s) return null; const d = new Date(s); return isNaN(d.getTime()) ? null : d; };\n\nconst now = new Date();\nconst startDate = parseDate(body.start);\nconst endDate = parseDate(body.end);\nconst isAllDay = body.allDay === true;\n\nconst lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//n8n//Nextcloud//EN','CALSCALE:GREGORIAN','BEGIN:VEVENT',`UID:n8n-event-${eventId}`,`DTSTAMP:${formatICalDate(now)}`];\n\nif (body.title) lines.push(`SUMMARY:${body.title}`);\nif (startDate) lines.push(isAllDay ? `DTSTART;VALUE=DATE:${formatICalDateOnly(startDate)}` : `DTSTART:${formatICalDate(startDate)}`);\nif (endDate) lines.push(isAllDay ? `DTEND;VALUE=DATE:${formatICalDateOnly(endDate)}` : `DTEND:${formatICalDate(endDate)}`);\nelse if (startDate && !isAllDay) lines.push(`DTEND:${formatICalDate(new Date(startDate.getTime() + 3600000))}`);\nif (body.description) lines.push(`DESCRIPTION:${body.description}`);\nif (body.location) lines.push(`LOCATION:${body.location}`);\n\nif (body.status) { const m = {'tentative':'TENTATIVE','confirmed':'CONFIRMED','cancelled':'CANCELLED'}; lines.push(`STATUS:${m[body.status]||body.status}`); } else lines.push('STATUS:CONFIRMED');\nif (body.transparency) { const m = {'busy':'OPAQUE','free':'TRANSPARENT'}; lines.push(`TRANSP:${m[body.transparency]||body.transparency}`); } else lines.push('TRANSP:OPAQUE');\nif (body.priority !== undefined) lines.push(`PRIORITY:${Math.min(9,Math.max(1,parseInt(body.priority)))}`);\nif (body.categories) lines.push(`CATEGORIES:${Array.isArray(body.categories)?body.categories.join(','):body.categories}`);\nif (body.url) lines.push(`URL:${body.url}`);\nif (body.recurrence) lines.push(`RRULE:${body.recurrence}`);\n\nif (body.attendees) {\n  (Array.isArray(body.attendees) ? body.attendees : [body.attendees]).forEach(a => {\n    if (a.email) lines.push(`ATTENDEE;${a.name?`CN=${a.name};`:''}CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=${a.status||'NEEDS-ACTION'}:mailto:${a.email}`);\n  });\n}\n\nlines.push('BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:Reminder','TRIGGER:-PT15M','END:VALARM','SEQUENCE:0','END:VEVENT','END:VCALENDAR');\n\nconst nextcloudUrl = $('Set Config').first().json.nextcloudUrl;\nconst nextcloudUser = $('Set Config').first().json.nextcloudUser;\nreturn [{ json: { icsBody: lines.join('\\r\\n'), eventUrl: `${nextcloudUrl}/remote.php/dav/calendars/${nextcloudUser}/${calendarName}/${eventId}.ics`, calendarName } }];"
+        "jsCode": "// Build ICS for create event\nconst body = $('Set Config').first().json.webhookBody;\nconst eventId = Date.now();\nconst calendarName = body.calendar || $('Set Config').first().json.defaultCalendar;\n\nconst formatICalDate = (d) => {\n  const pad = (n) => String(n).padStart(2, '0');\n  return `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`;\n};\nconst formatICalDateOnly = (d) => `${d.getUTCFullYear()}${String(d.getUTCMonth()+1).padStart(2,'0')}${String(d.getUTCDate()).padStart(2,'0')}`;\nconst parseDate = (s) => { if (!s) return null; const d = new Date(s); return isNaN(d.getTime()) ? null : d; };\n\nconst now = new Date();\nconst startDate = parseDate(body.start);\nconst endDate = parseDate(body.end);\nconst isAllDay = body.allDay === true;\n\nconst lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//n8n//Nextcloud//EN','CALSCALE:GREGORIAN','BEGIN:VEVENT',`UID:n8n-event-${eventId}`,`DTSTAMP:${formatICalDate(now)}`];\n\nif (body.title) lines.push(`SUMMARY:${body.title}`);\nif (startDate) lines.push(isAllDay ? `DTSTART;VALUE=DATE:${formatICalDateOnly(startDate)}` : `DTSTART:${formatICalDate(startDate)}`);\nif (endDate) lines.push(isAllDay ? `DTEND;VALUE=DATE:${formatICalDateOnly(endDate)}` : `DTEND:${formatICalDate(endDate)}`);\nelse if (startDate && !isAllDay) lines.push(`DTEND:${formatICalDate(new Date(startDate.getTime() + 3600000))}`);\nif (body.description) lines.push(`DESCRIPTION:${body.description}`);\nif (body.location) lines.push(`LOCATION:${body.location}`);\n\nif (body.status) { const m = {'tentative':'TENTATIVE','confirmed':'CONFIRMED','cancelled':'CANCELLED'}; lines.push(`STATUS:${m[body.status]||body.status}`); } else lines.push('STATUS:CONFIRMED');\nif (body.transparency) { const m = {'busy':'OPAQUE','free':'TRANSPARENT'}; lines.push(`TRANSP:${m[body.transparency]||body.transparency}`); } else lines.push('TRANSP:OPAQUE');\nif (body.priority !== undefined) lines.push(`PRIORITY:${Math.min(9,Math.max(1,parseInt(body.priority)))}`);\nif (body.categories) lines.push(`CATEGORIES:${Array.isArray(body.categories)?body.categories.join(','):body.categories}`);\nif (body.url) lines.push(`URL:${body.url}`);\nif (body.recurrence) lines.push(`RRULE:${body.recurrence}`);\n\nif (body.attendees) {\n  (Array.isArray(body.attendees) ? body.attendees : [body.attendees]).forEach(a => {\n    if (a.email) lines.push(`ATTENDEE;${a.name?`CN=${a.name};`:''}CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=${a.status||'NEEDS-ACTION'}:mailto:${a.email}`);\n  });\n}\n\nlines.push('BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:Reminder','TRIGGER:-PT15M','END:VALARM','SEQUENCE:0','END:VEVENT','END:VCALENDAR');\n\nconst nextcloudUrl = $('Set Config').first().json.nextcloudUrl;\nconst nextcloudUser = $('Set Config').first().json.nextcloudUser;\nreturn [{ json: { icsBody: lines.join('\\r\\n'), eventUrl: `${nextcloudUrl}/remote.php/dav/calendars/${nextcloudUser}/${calendarName}/${eventId}.ics`, calendarName } }];"
       },
       "id": "build-create",
       "name": "Build Create",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [930, 300]
+      "position": [
+        930,
+        300
+      ]
     },
     {
       "parameters": {
@@ -160,29 +265,43 @@
       "name": "Create Event",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1150, 300],
-      "credentials": { "httpBasicAuth": { "id": "YOUR_CREDENTIAL_ID", "name": "Nextcloud API" } },
+      "position": [
+        1150,
+        300
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Nextcloud API"
+        }
+      },
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const b = $('Webhook').first().json.body;\nreturn [{ json: { success: true, message: 'Event created!', event: { title: b.title, start: b.start, end: b.end, location: b.location || null, calendar: $('Build Create').first().json.calendarName } } }];"
+        "jsCode": "const b = $('Set Config').first().json.webhookBody;\nreturn [{ json: { success: true, message: 'Event created!', event: { title: b.title, start: b.start, end: b.end, location: b.location || null, calendar: $('Build Create').first().json.calendarName } } }];"
       },
       "id": "format-create",
       "name": "Format Create",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1370, 300]
+      "position": [
+        1370,
+        300
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Build ICS for update event\nconst body = $('Webhook').first().json.body;\nif (!body.eventUid) return [{ json: { success: false, message: 'eventUid is required' } }];\n\nconst calendarName = body.calendar || $('Set Config').first().json.defaultCalendar;\nconst formatICalDate = (d) => { const pad = (n) => String(n).padStart(2,'0'); return `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`; };\nconst formatICalDateOnly = (d) => `${d.getUTCFullYear()}${String(d.getUTCMonth()+1).padStart(2,'0')}${String(d.getUTCDate()).padStart(2,'0')}`;\nconst parseDate = (s) => { if (!s) return null; const d = new Date(s); return isNaN(d.getTime()) ? null : d; };\n\nconst now = new Date();\nconst startDate = parseDate(body.start);\nconst endDate = parseDate(body.end);\nconst isAllDay = body.allDay === true;\nconst sequence = (body.sequence || 0) + 1;\n\nconst lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//n8n//Nextcloud//EN','CALSCALE:GREGORIAN','BEGIN:VEVENT',`UID:${body.eventUid}`,`DTSTAMP:${formatICalDate(now)}`];\n\nif (body.title !== undefined) lines.push(`SUMMARY:${body.title}`);\nif (startDate) lines.push(isAllDay ? `DTSTART;VALUE=DATE:${formatICalDateOnly(startDate)}` : `DTSTART:${formatICalDate(startDate)}`);\nif (endDate) lines.push(isAllDay ? `DTEND;VALUE=DATE:${formatICalDateOnly(endDate)}` : `DTEND:${formatICalDate(endDate)}`);\nif (body.description !== undefined) lines.push(`DESCRIPTION:${body.description}`);\nif (body.location !== undefined) lines.push(`LOCATION:${body.location}`);\nif (body.status) { const m = {'tentative':'TENTATIVE','confirmed':'CONFIRMED','cancelled':'CANCELLED'}; lines.push(`STATUS:${m[body.status]||body.status}`); }\nif (body.transparency) { const m = {'busy':'OPAQUE','free':'TRANSPARENT'}; lines.push(`TRANSP:${m[body.transparency]||body.transparency}`); }\nif (body.priority !== undefined) lines.push(`PRIORITY:${Math.min(9,Math.max(1,parseInt(body.priority)))}`);\nif (body.categories) lines.push(`CATEGORIES:${Array.isArray(body.categories)?body.categories.join(','):body.categories}`);\nif (body.recurrence !== undefined && body.recurrence) lines.push(`RRULE:${body.recurrence}`);\nlines.push(`SEQUENCE:${sequence}`);\n\nlines.push('END:VEVENT','END:VCALENDAR');\n\nconst nextcloudUrl = $('Set Config').first().json.nextcloudUrl;\nconst nextcloudUser = $('Set Config').first().json.nextcloudUser;\nreturn [{ json: { icsBody: lines.join('\\r\\n'), eventUrl: `${nextcloudUrl}/remote.php/dav/calendars/${nextcloudUser}/${calendarName}/${body.eventUid}.ics`, sequence } }];"
+        "jsCode": "// Build ICS for update event\nconst body = $('Set Config').first().json.webhookBody;\nif (!body.eventUid) return [{ json: { success: false, message: 'eventUid is required' } }];\n\nconst calendarName = body.calendar || $('Set Config').first().json.defaultCalendar;\nconst formatICalDate = (d) => { const pad = (n) => String(n).padStart(2,'0'); return `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`; };\nconst formatICalDateOnly = (d) => `${d.getUTCFullYear()}${String(d.getUTCMonth()+1).padStart(2,'0')}${String(d.getUTCDate()).padStart(2,'0')}`;\nconst parseDate = (s) => { if (!s) return null; const d = new Date(s); return isNaN(d.getTime()) ? null : d; };\n\nconst now = new Date();\nconst startDate = parseDate(body.start);\nconst endDate = parseDate(body.end);\nconst isAllDay = body.allDay === true;\nconst sequence = (body.sequence || 0) + 1;\n\nconst lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//n8n//Nextcloud//EN','CALSCALE:GREGORIAN','BEGIN:VEVENT',`UID:${body.eventUid}`,`DTSTAMP:${formatICalDate(now)}`];\n\nif (body.title !== undefined) lines.push(`SUMMARY:${body.title}`);\nif (startDate) lines.push(isAllDay ? `DTSTART;VALUE=DATE:${formatICalDateOnly(startDate)}` : `DTSTART:${formatICalDate(startDate)}`);\nif (endDate) lines.push(isAllDay ? `DTEND;VALUE=DATE:${formatICalDateOnly(endDate)}` : `DTEND:${formatICalDate(endDate)}`);\nif (body.description !== undefined) lines.push(`DESCRIPTION:${body.description}`);\nif (body.location !== undefined) lines.push(`LOCATION:${body.location}`);\nif (body.status) { const m = {'tentative':'TENTATIVE','confirmed':'CONFIRMED','cancelled':'CANCELLED'}; lines.push(`STATUS:${m[body.status]||body.status}`); }\nif (body.transparency) { const m = {'busy':'OPAQUE','free':'TRANSPARENT'}; lines.push(`TRANSP:${m[body.transparency]||body.transparency}`); }\nif (body.priority !== undefined) lines.push(`PRIORITY:${Math.min(9,Math.max(1,parseInt(body.priority)))}`);\nif (body.categories) lines.push(`CATEGORIES:${Array.isArray(body.categories)?body.categories.join(','):body.categories}`);\nif (body.recurrence !== undefined && body.recurrence) lines.push(`RRULE:${body.recurrence}`);\nlines.push(`SEQUENCE:${sequence}`);\n\nlines.push('END:VEVENT','END:VCALENDAR');\n\nconst nextcloudUrl = $('Set Config').first().json.nextcloudUrl;\nconst nextcloudUser = $('Set Config').first().json.nextcloudUser;\nreturn [{ json: { icsBody: lines.join('\\r\\n'), eventUrl: `${nextcloudUrl}/remote.php/dav/calendars/${nextcloudUser}/${calendarName}/${body.eventUid}.ics`, sequence } }];"
       },
       "id": "build-update",
       "name": "Build Update",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [930, 500]
+      "position": [
+        930,
+        500
+      ]
     },
     {
       "parameters": {
@@ -200,29 +319,43 @@
       "name": "Update Event",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1150, 500],
-      "credentials": { "httpBasicAuth": { "id": "YOUR_CREDENTIAL_ID", "name": "Nextcloud API" } },
+      "position": [
+        1150,
+        500
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Nextcloud API"
+        }
+      },
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const b = $('Webhook').first().json.body;\nreturn [{ json: { success: true, message: 'Event updated!', event: { uid: b.eventUid, title: b.title || null, sequence: $('Build Update').first().json.sequence } } }];"
+        "jsCode": "const b = $('Set Config').first().json.webhookBody;\nreturn [{ json: { success: true, message: 'Event updated!', event: { uid: b.eventUid, title: b.title || null, sequence: $('Build Update').first().json.sequence } } }];"
       },
       "id": "format-update",
       "name": "Format Update",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1370, 500]
+      "position": [
+        1370,
+        500
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const body = $('Webhook').first().json.body;\nif (!body.eventUid) return [{ json: { success: false, message: 'eventUid is required' } }];\nconst calendarName = body.calendar || $('Set Config').first().json.defaultCalendar;\nconst nextcloudUrl = $('Set Config').first().json.nextcloudUrl;\nconst nextcloudUser = $('Set Config').first().json.nextcloudUser;\nreturn [{ json: { eventUrl: `${nextcloudUrl}/remote.php/dav/calendars/${nextcloudUser}/${calendarName}/${body.eventUid}.ics`, eventUid: body.eventUid, calendarName } }];"
+        "jsCode": "const body = $('Set Config').first().json.webhookBody;\nif (!body.eventUid) return [{ json: { success: false, message: 'eventUid is required' } }];\nconst calendarName = body.calendar || $('Set Config').first().json.defaultCalendar;\nconst nextcloudUrl = $('Set Config').first().json.nextcloudUrl;\nconst nextcloudUser = $('Set Config').first().json.nextcloudUser;\nreturn [{ json: { eventUrl: `${nextcloudUrl}/remote.php/dav/calendars/${nextcloudUser}/${calendarName}/${body.eventUid}.ics`, eventUid: body.eventUid, calendarName } }];"
       },
       "id": "build-delete",
       "name": "Build Delete",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [930, 700]
+      "position": [
+        930,
+        700
+      ]
     },
     {
       "parameters": {
@@ -236,53 +369,199 @@
       "name": "Delete Event",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1150, 700],
-      "credentials": { "httpBasicAuth": { "id": "YOUR_CREDENTIAL_ID", "name": "Nextcloud API" } },
+      "position": [
+        1150,
+        700
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Nextcloud API"
+        }
+      },
       "continueOnFail": true
     },
     {
       "parameters": {
-        "jsCode": "const b = $('Webhook').first().json.body;\nreturn [{ json: { success: true, message: 'Event deleted!', eventUid: b.eventUid } }];"
+        "jsCode": "const b = $('Set Config').first().json.webhookBody;\nreturn [{ json: { success: true, message: 'Event deleted!', eventUid: b.eventUid } }];"
       },
       "id": "format-delete",
       "name": "Format Delete",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1370, 700]
+      "position": [
+        1370,
+        700
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const action = $('Webhook').first().json.body?.action || 'unknown';\nreturn [{ json: { success: false, message: `Invalid action: ${action}. Use fetch, create, update, or delete.` } }];"
+        "jsCode": "const action = $('Set Config').first().json.webhookBody?.action || 'unknown';\nreturn [{ json: { success: false, message: `Invalid action: ${action}. Use fetch, create, update, or delete.` } }];"
       },
       "id": "format-error",
       "name": "Format Error",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [930, 900]
+      "position": [
+        930,
+        900
+      ]
     }
   ],
   "connections": {
-    "Webhook": { "main": [[{ "node": "Set Config", "type": "main", "index": 0 }]] },
-    "Set Config": { "main": [[{ "node": "Switch Action", "type": "main", "index": 0 }]] },
-    "Switch Action": {
+    "Webhook": {
       "main": [
-        [{ "node": "Build Fetch URL", "type": "main", "index": 0 }],
-        [{ "node": "Build Create", "type": "main", "index": 0 }],
-        [{ "node": "Build Update", "type": "main", "index": 0 }],
-        [{ "node": "Build Delete", "type": "main", "index": 0 }],
-        [{ "node": "Format Error", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "Build Fetch URL": { "main": [[{ "node": "Fetch Events", "type": "main", "index": 0 }]] },
-    "Fetch Events": { "main": [[{ "node": "Parse Fetch", "type": "main", "index": 0 }]] },
-    "Build Create": { "main": [[{ "node": "Create Event", "type": "main", "index": 0 }]] },
-    "Create Event": { "main": [[{ "node": "Format Create", "type": "main", "index": 0 }]] },
-    "Build Update": { "main": [[{ "node": "Update Event", "type": "main", "index": 0 }]] },
-    "Update Event": { "main": [[{ "node": "Format Update", "type": "main", "index": 0 }]] },
-    "Build Delete": { "main": [[{ "node": "Delete Event", "type": "main", "index": 0 }]] },
-    "Delete Event": { "main": [[{ "node": "Format Delete", "type": "main", "index": 0 }]] }
+    "Set Config": {
+      "main": [
+        [
+          {
+            "node": "Switch Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Action": {
+      "main": [
+        [
+          {
+            "node": "Build Fetch URL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Create",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Update",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Delete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Fetch URL": {
+      "main": [
+        [
+          {
+            "node": "Fetch Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Events": {
+      "main": [
+        [
+          {
+            "node": "Parse Fetch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Create": {
+      "main": [
+        [
+          {
+            "node": "Create Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Event": {
+      "main": [
+        [
+          {
+            "node": "Format Create",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Update": {
+      "main": [
+        [
+          {
+            "node": "Update Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Event": {
+      "main": [
+        [
+          {
+            "node": "Format Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Delete": {
+      "main": [
+        [
+          {
+            "node": "Delete Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Event": {
+      "main": [
+        [
+          {
+            "node": "Format Delete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1" },
+  "settings": {
+    "executionOrder": "v1"
+  },
   "staticData": null,
   "tags": [],
   "triggerCount": 1
